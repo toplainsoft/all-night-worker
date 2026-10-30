@@ -223,6 +223,25 @@ input[type="text"] {
   color: var(--muted); font-size: 12px; white-space: nowrap; pointer-events: none;
 }
 @media (max-width: 560px) { .hint { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 560px) {
+  .sign h1 { font-size: 1.6rem; margin-bottom: 2px; }
+  .mood { font-size: 12px; max-width: 26ch; }
+  .clock { font-size: 1.4rem; }
+  .clock span { display: none; }
+  .dock { padding: 9px 10px; gap: 8px; border-radius: 12px; }
+  .dock .who { display: none; }
+  .dock .chips { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .dock .chips::-webkit-scrollbar { display: none; }
+  .dock .chip { font-size: 12px; padding: 4px 10px; }
+  .dock .actions { flex: 1 1 100%; margin-left: 0; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .dock .actions::-webkit-scrollbar { display: none; }
+  .dock .btn { font-size: 13px; padding: 6px 10px; white-space: nowrap; flex: none; }
+  .dock .elapsed { font-size: 12px; flex: none; }
+  .tag { font-size: 11px; padding: 2px 7px 3px; }
+  .tag b { font-size: 12px; }
+  .hint { bottom: calc(118px + env(safe-area-inset-bottom, 0px)); white-space: normal; text-align: center; width: calc(100% - 48px); }
+  .toast { top: calc(96px + env(safe-area-inset-top, 0px)); }
+}
 
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%);
@@ -267,7 +286,8 @@ input[type="text"] {
   <div class="actions" data-in style="margin-left:0">
     <button class="btn" id="stroll" type="button">산책가기</button>
     <button class="btn" id="floorsBtn" type="button" aria-expanded="false" aria-controls="floorMenu">다른 층 구경가기</button>
-    <button class="btn" id="fbBtn" type="button">의견 보내기</button>
+    <!-- 의견 보내기: 다시 쓰려면 hidden 을 지우세요 -->
+    <button class="btn" id="fbBtn" type="button" hidden>의견 보내기</button>
     <button class="btn quiet" id="leave" type="button">퇴장하기</button>
   </div>
 </div>
@@ -462,7 +482,9 @@ input[type="text"] {
     $("dock").hidden = true;
     push({ leaving: Date.now() });
     const mine = seatOf("me");
+    let done = false;
     const finish = () => {
+      if (done) return; done = true;
       const stayed = fmtElapsed(Date.now() - me.since);
       entered = false; leaving = false;
       if (net) net.leave();
@@ -474,7 +496,8 @@ input[type="text"] {
       $("gate").hidden = false;
       sync();
     };
-    if (mine) startExit(owlState[mine.seat], mine.seat, finish); else finish();
+    if (mine) { startExit(owlState[mine.seat], mine.seat, finish); setTimeout(finish, 15000); } // 탭이 뒤로 가서 애니메이션이 멈춰도 퇴장은 끝나게
+    else finish();
   });
   $("myname").addEventListener("click", () => { nick.value = me.name; $("enter").textContent = "바꾸기"; jobIn.value = me.job; $("gate").hidden = false; nick.focus(); });
 
@@ -501,6 +524,21 @@ input[type="text"] {
   scene.fog = new THREE.Fog("#120f1c", 18, 32);
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   const target = new THREE.Vector3(-0.4, 1.1, -0.8);
+  const HOME_TARGET = new THREE.Vector3(-0.4, 1.1, -0.8);
+  let portrait = false;
+  const focus = new THREE.Vector3(-1.3, 1.0, 0.6), focusTmp = new THREE.Vector3();
+  // 폰 세로 화면: 카메라가 내 올빼미(입장 전엔 문 쪽 → 앞줄)를 따라가요
+  function phoneFocus(dt) {
+    const mine = entered ? seatOf("me") : null;
+    if (mine) {
+      const st = owlState[mine.seat];
+      if (st.owl) { st.owl.getWorldPosition(focusTmp); focusTmp.y = 1.0; }
+      else focusTmp.set(st.group.position.x, 1.0, st.group.position.z);
+      focusTmp.z += 0.3;
+    } else focusTmp.set(-1.3, 1.0, 0.6);
+    focus.lerp(focusTmp, Math.min(1, dt * 3));
+    target.copy(focus);
+  }
   const orbit = { yaw: 0, pitch: 0.48, dist: 13 };
 
   scene.add(new THREE.AmbientLight("#4a4370", 0.75));
@@ -1202,8 +1240,11 @@ input[type="text"] {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    orbit.minD = w / h < 0.8 ? 15 : 9; orbit.maxD = w / h < 0.8 ? 28 : 19;
-    if (!orbit.touched) orbit.dist = mode === "outside" ? (w / h < 0.8 ? 34 : 21) : (w / h < 0.8 ? 23 : 14);
+    portrait = w / h < 0.8;
+    camera.fov = portrait ? 50 : 42; camera.updateProjectionMatrix();
+    orbit.minD = portrait ? 5 : 9; orbit.maxD = portrait ? 22 : 19;
+    if (!orbit.touched) orbit.dist = mode === "outside" ? (portrait ? 34 : 21) : (portrait ? 8.5 : 14);
+    if (!orbit.touched && mode === "inside") orbit.pitch = portrait ? 0.78 : 0.48;
     if (mode === "outside") { orbit.minD = 12; orbit.maxD = 45; }
     orbit.dist = Math.min(orbit.maxD, Math.max(orbit.minD, orbit.dist));
   }
@@ -1304,6 +1345,7 @@ input[type="text"] {
 
   function frame() {
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    if (mode === "inside") { if (portrait) phoneFocus(dt); else target.copy(HOME_TARGET); }
     camera.position.set(
       target.x + orbit.dist * Math.sin(orbit.yaw) * Math.cos(orbit.pitch),
       target.y + orbit.dist * Math.sin(orbit.pitch),
@@ -1422,7 +1464,7 @@ input[type="text"] {
   }
   function goInside() {
     mode = "inside";
-    target.set(-0.4, 1.1, -0.8);
+    target.copy(HOME_TARGET);
     Object.assign(orbit, savedOrbit);
     $("labels").hidden = false; $("outLabels").hidden = true;
     $("dock").classList.remove("outside");
@@ -1436,7 +1478,10 @@ input[type="text"] {
     strolling = true;
     push({ outside: true });
     const mine = seatOf("me");
-    if (mine && owlState[mine.seat].owl && !reduceMotion) startExit(owlState[mine.seat], mine.seat, goOutside, true);
+    if (mine && owlState[mine.seat].owl && !reduceMotion) {
+      let out = false; const go = () => { if (out) return; out = true; goOutside(); };
+      startExit(owlState[mine.seat], mine.seat, go, true); setTimeout(go, 12000);
+    }
     else { if (mine) { const st = owlState[mine.seat]; if (st.owl) { st.group.remove(st.owl); st.owl = null; } st.away = true; } goOutside(); }
     sync();
   });
