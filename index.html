@@ -118,6 +118,13 @@ textarea:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: none; border-top-color: var(--paper); }
 .btn.quiet { background: transparent; color: var(--muted); }
 .tag.me { border-color: var(--lamp); cursor: default; }
+/* 다른 올빼미 이름표: 이름만, 반투명하게, 멀수록 작게 (뒷줄 올빼미를 가리지 않게) */
+.tag { transform-origin: 50% 100%; }
+.tag:not(.me) { background: rgba(18, 15, 28, 0.42); border-color: transparent; padding: 1px 7px 2px; }
+.tag:not(.me) .job, .tag:not(.me) i { display: none; }
+.tag:not(.me):hover, .tag:not(.me).peek { background: rgba(18, 15, 28, 0.85); border-color: var(--edge); z-index: 999 !important; }
+.tag:not(.me):hover i, .tag:not(.me).peek i, .tag:not(.me):hover .job, .tag:not(.me).peek .job { display: block; }
+.tag:not(.me):hover .job, .tag:not(.me).peek .job { display: inline; }
 .tag.me b::before { content: "나 · "; color: var(--lamp); font-size: 11px; }
 
 .top {
@@ -1170,6 +1177,7 @@ input[type="text"] {
 
   function cheerSeat(i) {
     const st = owlState[i];
+    if (st.tag && st.entry && !st.entry.isMe) { st.tag.classList.add("peek"); clearTimeout(st.peekT); st.peekT = setTimeout(() => st.tag && st.tag.classList.remove("peek"), 3000); }
     if (!st.entry || st.entry.isMe) return;
     if (!entered) { showToast("먼저 책상에 앉아야 응원할 수 있어요."); return; }
     if (Date.now() < cheerCooldown) return;
@@ -1407,9 +1415,15 @@ input[type="text"] {
         }
         if (st.tag && !st.tag.hidden) {
           st.owl.updateMatrixWorld();
-          tmp.set(0, 1.75, 0).applyMatrix4(st.owl.matrixWorld).project(camera);
+          const isMe = st.entry.isMe;
+          st.owl.getWorldPosition(focusTmp);
+          const dist = camera.position.distanceTo(focusTmp);
+          tmp.set(0, isMe ? 1.75 : 1.6, 0).applyMatrix4(st.owl.matrixWorld).project(camera);
           const vis = tmp.z < 1, sx = ((tmp.x + 1) / 2 * W) + "px", sy = ((1 - tmp.y) / 2 * H) + "px";
+          const sc = isMe ? 1 : Math.max(0.62, Math.min(1, 9 / dist));
           st.tag.style.left = sx; st.tag.style.top = sy; st.tag.style.display = vis ? "" : "none";
+          st.tag.style.transform = "translate(-50%, -100%) scale(" + sc.toFixed(3) + ")";
+          st.tag.style.zIndex = isMe ? 500 : String(Math.round(400 - dist * 10));
           if (st.bubble && !st.bubble.hidden) { st.bubble.style.left = sx; st.bubble.style.top = sy; st.bubble.style.display = vis ? "" : "none"; }
         }
       }
