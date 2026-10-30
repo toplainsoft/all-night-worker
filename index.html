@@ -1,0 +1,1791 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>올빼미방</title>
+<meta name="description" content="밤샘하는 사람들이 올빼미가 되어 같이 깨어 있는 온라인 작업방">
+<meta property="og:title" content="올빼미방">
+<meta property="og:description" content="밤에만 불 켜지는 건물 2층, 같이 깨어 있는 올빼미들">
+<meta name="theme-color" content="#15131f">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+[hidden] { display: none !important; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+/* Layout: full-bleed 3D reading room; sign + clock on top, my desk controls docked at the bottom, entry card on first visit */
+:root {
+  color-scheme: dark;
+  --bg: #15131f;
+  --panel: rgba(24, 21, 36, 0.86);
+  --edge: #3a3250;
+  --paper: #eee5d1;
+  --muted: #a39dbd;
+  --faint: #5d5775;
+  --lamp: #ffbf5e;
+  --ink: #120f1c;
+  --font-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+#stage { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.tag {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: rgba(18, 15, 28, 0.78);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 3px 9px 4px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.tag b { font-weight: 600; font-size: 13px; color: var(--paper); }
+.tag .job { font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 5px; }
+.tag i { display: block; font-style: normal; color: var(--muted); font-size: 11px; }
+textarea {
+  font: inherit; color: var(--paper); background: #120f1c;
+  border: 1px solid var(--edge); border-radius: 6px; padding: 9px 12px; width: 100%; min-height: 120px; resize: vertical;
+}
+textarea:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.inbox { max-height: 58vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin: 0 -4px; padding: 0 4px; }
+.note { border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px; background: #15131f; }
+.note header { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.note header b { color: var(--paper); font-weight: 600; }
+.note .kind { color: var(--lamp); margin-right: 6px; }
+.note p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; color: var(--paper); }
+.empty { color: var(--muted); font-size: 14px; padding: 12px 0; }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: var(--lamp); color: var(--ink); font-size: 12px; line-height: 18px; text-align: center; }
+.dock [data-out] { display: none; }
+.dock.outside [data-out] { display: inline-block; }
+.dock.outside [data-in] { display: none !important; }
+.menu {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  background: #1d1a2b; border: 1px solid var(--edge); border-radius: 10px;
+  padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 220px;
+  box-shadow: 0 12px 40px #000a;
+}
+@media (max-width: 560px) { .menu { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+.menu .label { padding: 2px 4px 4px; }
+.menu button {
+  font: inherit; font-size: 14px; text-align: left; color: var(--paper);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 7px 10px; cursor: pointer;
+  display: flex; justify-content: space-between; gap: 16px;
+}
+.menu button:hover, .menu button[aria-current="true"] { border-color: var(--edge); background: #2a2438; }
+.menu button span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.menu button .mine { color: var(--lamp); }
+#outLabels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.floors { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; pointer-events: auto; max-width: 60vw; }
+.floor-btn {
+  font: inherit; font-size: 12px; white-space: nowrap;
+  color: var(--muted); background: rgba(18, 15, 28, 0.7);
+  border: 1px solid var(--edge); border-radius: 6px; padding: 3px 9px; cursor: pointer;
+}
+.floor-btn b { color: var(--paper); font-weight: 600; margin-right: 4px; }
+.floor-btn[aria-pressed="true"] { border-color: var(--lamp); color: var(--paper); }
+.floor-btn .mine { color: var(--lamp); margin-left: 4px; }
+.bubble {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 46px));
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 14px;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px #0007;
+}
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: none; border-top-color: var(--paper); }
+.btn.quiet { background: transparent; color: var(--muted); }
+.tag.me { border-color: var(--lamp); cursor: default; }
+.tag.me b::before { content: "나 · "; color: var(--lamp); font-size: 11px; }
+
+.top {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  pointer-events: none;
+}
+.sign small { display: block; font-size: 11px; letter-spacing: 0.14em; color: var(--muted); }
+.sign h1 { margin: 2px 0 6px; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 5vw, 2.4rem); line-height: 1.1; }
+.mood { font-size: 14px; color: var(--paper); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; max-width: 34ch; }
+.mood .count { color: var(--lamp); font-weight: 600; }
+.mood .sub { color: var(--muted); }
+.stamp { border: 2px solid #e2796b; color: #f0907f; border-radius: 4px; padding: 1px 8px; font-family: var(--font-display); font-weight: 700; transform: rotate(-4deg); display: inline-block; }
+.clock { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: clamp(1.5rem, 4.5vw, 2.1rem); color: var(--lamp); text-align: right; line-height: 1; }
+.clock span { display: block; font-family: var(--font-body); font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))));
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.who button.name {
+  font: inherit; font-weight: 600; color: var(--paper);
+  background: none; border: none; padding: 0; cursor: pointer;
+  text-decoration: underline dotted var(--faint); text-underline-offset: 4px;
+  max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 2px solid var(--paper); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px; flex: 1 1 260px; min-width: 0; }
+.field .chips { flex: none; }
+.chip {
+  white-space: nowrap;
+  flex: none;
+  font: inherit; font-size: 13px; color: var(--muted);
+  background: transparent; border: 1px solid var(--edge); border-radius: 999px;
+  padding: 3px 10px; cursor: pointer;
+}
+.chip[aria-pressed="true"] { color: var(--ink); background: var(--lamp); border-color: var(--lamp); font-weight: 600; }
+.actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.elapsed { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.btn {
+  font: inherit; font-weight: 600; font-size: 14px;
+  border-radius: 6px; padding: 7px 12px; cursor: pointer;
+  border: 1px solid var(--edge); background: #2a2438; color: var(--paper);
+}
+.btn.primary { background: var(--lamp); color: var(--ink); border-color: var(--lamp); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
+/* entry */
+.gate {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(10, 9, 18, 0.55);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px;
+}
+.card {
+  width: min(420px, 100%);
+  background: #1d1a2b;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 22px 22px 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 20px 60px #0009;
+}
+.card h2 { margin: 0; font-family: var(--font-display); font-size: 1.5rem; text-wrap: balance; }
+.card p { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+.preview { display: flex; justify-content: center; }
+.preview svg { width: 96px; height: 106px; }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.label { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+input[type="text"] {
+  font: inherit; color: var(--paper); background: #120f1c;
+  border: 1px solid var(--edge); border-radius: 6px; padding: 9px 12px; width: 100%;
+}
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; outline-offset: 2px; }
+.swatch[aria-pressed="true"] { border-color: var(--lamp); }
+
+.hint {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted); font-size: 12px; white-space: nowrap; pointer-events: none;
+}
+@media (max-width: 560px) { .hint { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: calc(110px + env(safe-area-inset-top, 0px));
+  background: var(--paper); color: var(--ink);
+  padding: 9px 16px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  max-width: calc(100% - 32px); box-shadow: 0 8px 30px #0008;
+}
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="올빼미방 3D 화면"></div>
+<div id="labels"></div>
+
+<div class="top">
+  <div class="sign">
+    <small id="floorLabel">밤에만 불 켜지는 건물 · 2층</small>
+    <h1>올빼미방</h1>
+    <div class="mood" id="mood"></div>
+  </div>
+  <div class="clock" id="clock">00:00<span>밤 9시 – 아침 7시</span></div>
+</div>
+
+<div id="outLabels" hidden></div>
+<div class="menu" id="floorMenu" hidden></div>
+<div class="hint" id="hint" hidden>드래그해서 둘러보고, 다른 올빼미를 누르면 응원을 보내요</div>
+
+<div class="dock" id="dock" hidden>
+  <div class="who">
+    <span class="dot" id="mydot"></span>
+    <button class="name" id="myname" type="button" title="이름 바꾸기"></button>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="지금 뭐 하는 중" data-in></div>
+  <div class="actions">
+    <span class="elapsed" id="elapsed" title="오늘 밤 버틴 시간">0:00</span>
+    <button class="btn primary" id="coffee" type="button" data-in>커피 리필</button>
+    <button class="btn primary" id="comeback" type="button" data-out>책상으로 돌아가기</button>
+    <button class="btn" id="desksound" type="button" aria-pressed="false" data-in>책상 소리</button>
+    <button class="btn" id="sound" type="button" aria-pressed="false">빗소리</button>
+  </div>
+  <div class="actions" data-in style="margin-left:0">
+    <button class="btn" id="stroll" type="button">산책가기</button>
+    <button class="btn" id="floorsBtn" type="button" aria-expanded="false" aria-controls="floorMenu">다른 층 구경가기</button>
+    <!-- 의견 보내기: 다시 쓰려면 hidden 을 지우세요 -->
+    <button class="btn" id="fbBtn" type="button" hidden>의견 보내기</button>
+    <button class="btn quiet" id="leave" type="button">퇴장하기</button>
+  </div>
+</div>
+
+<div class="gate" id="gate">
+  <form class="card" id="gateForm">
+    <h2 id="gateTitle">올빼미방에 들어가요</h2>
+    <p id="gateText">이름표를 달고 내 올빼미 깃털 색을 골라주세요.</p>
+    <div class="preview" id="preview"></div>
+    <div class="field">
+      <label class="label" for="nick">이름</label>
+      <input type="text" id="nick" maxlength="12" autocomplete="off" required>
+    </div>
+    <div class="field">
+      <label class="label" for="job">하는 일 (안 써도 돼요)</label>
+      <input type="text" id="job" maxlength="14" autocomplete="off" placeholder="예: 일러스트레이터, 대학원생">
+    </div>
+    <div class="field">
+      <span class="label" id="sw-label">깃털 색</span>
+      <div class="swatches" id="swatches" role="group" aria-labelledby="sw-label"></div>
+    </div>
+    <div class="field">
+      <span class="label" id="st-label">지금 뭐 하는 중?</span>
+      <div class="chips" id="gateChips" role="group" aria-labelledby="st-label"></div>
+    </div>
+    <button class="btn primary" id="enter" type="submit" style="padding:11px">책상에 앉기</button>
+  </form>
+</div>
+
+<div class="gate" id="fbGate" hidden>
+  <form class="card" id="fbForm">
+    <h2>올빼미방 개선 의견</h2>
+    <p>이런 게 있으면 좋겠다, 이건 불편하다, 뭐든 적어주세요. 방을 만든 사람에게 모여요.</p>
+    <div class="field">
+      <span class="label" id="fbk-label">어떤 의견인가요?</span>
+      <div class="chips" id="fbKinds" role="group" aria-labelledby="fbk-label"></div>
+    </div>
+    <div class="field">
+      <label class="label" for="fbText">의견</label>
+      <textarea id="fbText" maxlength="500" required placeholder="예: 새벽 5시쯤 창밖에 새 소리가 났으면 좋겠어요"></textarea>
+    </div>
+    <div class="row">
+      <button class="btn quiet" id="fbClose" type="button">닫기</button>
+      <button class="btn primary" id="fbSend" type="submit">보내기</button>
+    </div>
+  </form>
+</div>
+
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const STATUSES = [["work", "작업 중"], ["study", "공부 중"], ["awake", "그냥 못 자는 중"], ["slack", "딴짓 중"]];
+  const STATUS_LABEL = Object.fromEntries(STATUSES);
+  const FEATHERS = [
+    { key: "brown", label: "갈색", body: "#8a6a4f", belly: "#d9c3a5" },
+    { key: "grey", label: "잿빛", body: "#7f7c8f", belly: "#cfcbd8" },
+    { key: "snow", label: "흰색", body: "#e6e1d6", belly: "#fbf8f1" },
+    { key: "night", label: "보라", body: "#5b4a72", belly: "#b7a6cc" },
+    { key: "gold", label: "황금", body: "#c39437", belly: "#f1deab" },
+    { key: "rust", label: "적갈", body: "#9a4f3a", belly: "#e6b9a0" },
+    { key: "moss", label: "이끼", body: "#5f7553", belly: "#c8d5b7" },
+    { key: "sky", label: "하늘", body: "#6f8fb8", belly: "#d2def0" },
+    { key: "peach", label: "분홍", body: "#c98a98", belly: "#f4d6dc" },
+    { key: "ink", label: "먹색", body: "#3a3743", belly: "#9d99aa" }
+  ];
+  const MAX_COFFEE = 20;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const loadedAt = Date.now();
+  const $ = (id) => document.getElementById(id);
+
+  function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function clean(v, max) { return typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, "").slice(0, max) : ""; }
+  function fmtElapsed(ms) { const m = Math.max(0, Math.floor(ms / 60000)); return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); }
+
+  const me = {
+    name: load("owl2.name", "올빼미 " + (10 + Math.floor(Math.random() * 90))),
+    color: Math.max(0, Math.min(9, parseInt(load("owl2.color", "0"), 10) || 0)),
+    status: load("owl2.status", "work"),
+    coffee: 0,
+    job: load("owl2.job", ""),
+    floor: 2,
+    since: 0,
+    seat: -1
+  };
+  if (!STATUS_LABEL[me.status]) me.status = "work";
+  let entered = false;
+  let mode = "inside", strolling = false;
+  let leaving = false;
+  let cheerCooldown = 0;
+  const lastCoffee = {};
+
+  // ---------- toast ----------
+  const toast = $("toast"); let toastT = 0;
+  function showToast(t) { toast.textContent = t; toast.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (toast.hidden = true), 3000); }
+
+  // ---------- entry card ----------
+  function owlSvg(f) {
+    return '<svg viewBox="0 0 54 60" aria-hidden="true"><path d="M8 22 L13 5 L20 17 Z M46 22 L41 5 L34 17 Z" fill="' + f.body + '"/>' +
+      '<ellipse cx="27" cy="36" rx="20" ry="22" fill="' + f.body + '"/><ellipse cx="27" cy="43" rx="12" ry="13" fill="' + f.belly + '"/>' +
+      '<circle cx="19" cy="27" r="8" fill="#f4eee0"/><circle cx="35" cy="27" r="8" fill="#f4eee0"/>' +
+      '<circle cx="19" cy="27" r="4" fill="#15131f"/><circle cx="35" cy="27" r="4" fill="#15131f"/><path d="M24 33 L27 38 L30 33 Z" fill="#ffbf5e"/></svg>';
+  }
+  const nick = $("nick"); nick.value = me.name;
+  const jobIn = $("job"); jobIn.value = me.job;
+  const swatches = $("swatches");
+  FEATHERS.forEach((f, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "swatch"; b.id = "sw-" + f.key;
+    b.style.background = f.body; b.setAttribute("aria-label", f.label);
+    b.setAttribute("aria-pressed", String(i === me.color));
+    b.addEventListener("click", () => {
+      me.color = i;
+      swatches.querySelectorAll(".swatch").forEach((s) => s.setAttribute("aria-pressed", String(s === b)));
+      $("preview").innerHTML = owlSvg(FEATHERS[i]);
+    });
+    swatches.appendChild(b);
+  });
+  $("preview").innerHTML = owlSvg(FEATHERS[me.color]);
+
+  function buildChips(container, prefix) {
+    container.textContent = "";
+    STATUSES.forEach(([key, label]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.id = prefix + key; b.textContent = label;
+      b.setAttribute("aria-pressed", String(key === me.status));
+      b.addEventListener("click", () => {
+        me.status = key; save("owl2.status", key);
+        document.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.id.endsWith(key))));
+        if (entered) { push({ status: key }); sync(); }
+      });
+      container.appendChild(b);
+    });
+  }
+  buildChips($("gateChips"), "g-");
+  buildChips($("chips"), "d-");
+
+  let claiming = false;
+  $("gateForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (claiming) return;
+    me.name = clean(nick.value.trim(), 12) || "이름 없는 올빼미";
+    me.job = clean(jobIn.value.trim(), 14);
+    save("owl2.name", me.name); save("owl2.color", String(me.color)); save("owl2.job", me.job);
+    if (!entered) {
+      if (net) {
+        claiming = true;
+        const btn = $("enter"); btn.disabled = true; btn.textContent = "빈 책상 찾는 중";
+        let r = null;
+        try { r = await net.claim(); } catch (err) { r = null; }
+        claiming = false; btn.disabled = false;
+        if (!r || !r.ok) {
+          btn.textContent = "다시 시도";
+          $("gateTitle").textContent = r && r.reason === "full" ? "지금 올빼미방이 만석이에요" : "자리를 못 찾았어요";
+          $("gateText").textContent = r && r.reason === "full"
+            ? "올빼미 " + (r.cap || CAP) + "마리가 모두 책상에 앉아 있어요. 누가 퇴장하면 들어갈 수 있으니 잠시 뒤 다시 눌러주세요."
+            : "연결이 잠깐 불안정했어요. 잠시 뒤 다시 눌러주세요.";
+          return;
+        }
+        btn.textContent = "책상에 앉기";
+        me.floor = r.floor; me.seat = r.seat;
+      } else { me.floor = 2; me.seat = 0; }
+      $("gate").hidden = true;
+      $("myname").textContent = me.name;
+      $("mydot").style.background = FEATHERS[me.color].body;
+      entered = true;
+      $("gateTitle").textContent = "올빼미방에 들어가요";
+      $("gateText").textContent = "이름표를 달고 내 올빼미 깃털 색을 골라주세요.";
+      me.since = Date.now(); me.coffee = 0; meWalkPending = true;
+      if (viewFloor !== me.floor) setViewFloor(me.floor);
+      $("dock").hidden = false;
+      $("hint").hidden = false;
+      setTimeout(() => ($("hint").hidden = true), 9000);
+      if (net) net.sit({ name: me.name, job: me.job, color: me.color, status: me.status, coffee: me.coffee, since: me.since, seat: me.seat, floor: me.floor });
+      if (me.floor > 2) showToast("아래층이 꽉 차서 " + me.floor + "층 책상으로 안내할게요.");
+    } else {
+      $("gate").hidden = true;
+      $("myname").textContent = me.name;
+      $("mydot").style.background = FEATHERS[me.color].body;
+      push({ name: me.name, job: me.job, color: me.color });
+    }
+    sync();
+  });
+  $("leave").addEventListener("click", () => {
+    if (!entered || leaving) return;
+    leaving = true;
+    $("dock").hidden = true;
+    push({ leaving: Date.now() });
+    const mine = seatOf("me");
+    const finish = () => {
+      const stayed = fmtElapsed(Date.now() - me.since);
+      entered = false; leaving = false;
+      if (net) net.leave();
+      me.coffee = 0; me.seat = -1;
+      $("gateTitle").textContent = "잘 자요, " + me.name;
+      $("gateText").textContent = "오늘 밤 " + stayed + " 버텼어요. 다시 들어오려면 아래에서 앉아주세요.";
+      $("enter").textContent = "다시 앉기";
+      nick.value = me.name;
+      $("gate").hidden = false;
+      sync();
+    };
+    if (mine) startExit(owlState[mine.seat], mine.seat, finish); else finish();
+  });
+  $("myname").addEventListener("click", () => { nick.value = me.name; $("enter").textContent = "바꾸기"; jobIn.value = me.job; $("gate").hidden = false; nick.focus(); });
+
+  $("coffee").addEventListener("click", () => {
+    if (me.coffee >= MAX_COFFEE) { showToast("커피는 " + MAX_COFFEE + "잔까지예요. 이제 물 마셔요."); return; }
+    me.coffee += 1;
+    push({ coffee: me.coffee });
+    const mine = seatOf("me");
+    if (mine) owlState[mine.seat].sipT = 1.2;
+    showToast(me.coffee >= 4 ? "커피 " + me.coffee + "잔째예요. 물도 한 잔 마셔요." : "커피 한 잔 채웠어요.");
+    sync();
+  });
+
+  function push(patch) { if (net && entered) net.update(patch); }
+
+  // ---------- three.js scene ----------
+  const stage = $("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#120f1c");
+  scene.fog = new THREE.Fog("#120f1c", 18, 32);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  const target = new THREE.Vector3(-0.4, 1.1, -0.8);
+  const orbit = { yaw: 0, pitch: 0.48, dist: 13 };
+
+  scene.add(new THREE.AmbientLight("#4a4370", 0.75));
+  scene.add(new THREE.HemisphereLight("#6c6aa8", "#1a1424", 0.35));
+  const moonLight = new THREE.DirectionalLight("#9fb0ff", 0.35);
+  moonLight.position.set(-3, 6, -8); scene.add(moonLight);
+
+  const lambert = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, extra || {}));
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), lambert("#2b2233"));
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  for (let i = -7; i <= 7; i++) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.03, 30), lambert("#221b2a"));
+    line.rotation.x = -Math.PI / 2; line.position.set(i * 1.1, 0.002, 0); scene.add(line);
+  }
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), lambert("#1f1b2e"));
+  backWall.position.set(0, 5, -5.6); scene.add(backWall);
+  [-9, 9].forEach((x) => {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), lambert("#1a1727"));
+    w.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2; w.position.set(x, 5, 0); scene.add(w);
+  });
+
+  // window with live sky
+  const skyCanvas = document.createElement("canvas"); skyCanvas.width = 1024; skyCanvas.height = 420;
+  const skyTex = new THREE.CanvasTexture(skyCanvas); skyTex.encoding = THREE.sRGBEncoding;
+  const stars = Array.from({ length: 110 }, () => ({ x: Math.random(), y: Math.random() * 0.8, r: Math.random() * 1.8 + 0.5 }));
+  function drawSky() {
+    const c = skyCanvas.getContext("2d"), W = skyCanvas.width, H = skyCanvas.height;
+    const now = new Date(), h = now.getHours(), hour = h + now.getMinutes() / 60;
+    let top = "#0a0918", bot = "#231d42", starA = 1;
+    if (h >= 5 && h < 7) { top = "#2b2552"; bot = "#d4917a"; starA = 0.35; }
+    else if (h >= 7 && h < 17) { top = "#5f80b8"; bot = "#bccbe3"; starA = 0; }
+    else if (h >= 17 && h < 20) { top = "#2d2a5a"; bot = "#b06f6a"; starA = 0.3; }
+    const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, top); g.addColorStop(1, bot);
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    stars.forEach((s) => { c.fillStyle = "rgba(236,230,255," + (starA * 0.85) + ")"; c.beginPath(); c.arc(s.x * W, s.y * H, s.r, 0, 7); c.fill(); });
+    const k = ((hour - 18 + 24) % 24) / 12;
+    if (k <= 1 && starA > 0) {
+      const mx = W * (0.1 + 0.8 * k), my = H * (0.7 - 0.5 * Math.sin(Math.PI * k));
+      c.fillStyle = "rgba(236,230,255,0.13)"; c.beginPath(); c.arc(mx, my, 70, 0, 7); c.fill();
+      c.fillStyle = "#f1ecff"; c.beginPath(); c.arc(mx, my, 38, 0, 7); c.fill();
+      c.fillStyle = top; c.beginPath(); c.arc(mx + 16, my - 10, 33, 0, 7); c.fill();
+    }
+    c.fillStyle = "#0b0a14";
+    for (let i = 0; i < 12; i++) { const bw = 60 + (i * 37) % 50, bh = 50 + (i * 53) % 90; c.fillRect(i * 88 - 10, H - bh, bw, bh); }
+    c.fillStyle = "rgba(255,191,94,0.85)";
+    for (let i = 0; i < 12; i += 2) c.fillRect(i * 88 + 14, H - 30 - (i * 7) % 30, 9, 11);
+    skyTex.needsUpdate = true;
+  }
+  drawSky(); setInterval(drawSky, 60000);
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.7), new THREE.MeshBasicMaterial({ map: skyTex }));
+  win.position.set(0.6, 3.3, -5.58); scene.add(win);
+  const frameMat = lambert("#3a3250");
+  [[0.6, 5.2, 9.4, 0.2], [0.6, 1.4, 9.4, 0.2], [-4, 3.3, 0.2, 4], [5.2, 3.3, 0.2, 4], [0.6, 3.3, 0.12, 3.7], [-1.7, 3.3, 0.08, 3.7], [2.9, 3.3, 0.08, 3.7]].forEach(([x, y, w, h]) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.12), frameMat); b.position.set(x, y, -5.52); scene.add(b);
+  });
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.12, 0.5), frameMat); sill.position.set(0.6, 1.32, -5.35); scene.add(sill);
+
+  // entrance door on the back wall, left of the window
+  const DOOR = { x: -6.4, z: -5.55 };
+  const doorFrame = lambert("#3a3250");
+  [[-7.15, 1.35, 0.14, 2.7], [-5.65, 1.35, 0.14, 2.7], [-6.4, 2.72, 1.64, 0.14]].forEach(([x, y, w, h]) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.16), doorFrame); b.position.set(x, y, -5.5); scene.add(b);
+  });
+  const hallway = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.6), new THREE.MeshBasicMaterial({ color: "#ffcf8a" }));
+  hallway.position.set(-6.4, 1.3, -5.585); scene.add(hallway);
+  const doorPivot = new THREE.Group(); doorPivot.position.set(-7.08, 0, -5.5); scene.add(doorPivot);
+  const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(1.36, 2.6, 0.07), lambert("#4a3a33")); doorPanel.position.set(0.68, 1.3, 0); doorPivot.add(doorPanel);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), lambert("#d9b26a")); knob.position.set(1.2, 1.25, 0.06); doorPivot.add(knob);
+  const doorLight = new THREE.PointLight("#ffbf6e", 0, 5, 2); doorLight.position.set(-6.4, 1.6, -4.9); scene.add(doorLight);
+  const signCanvas = document.createElement("canvas"); signCanvas.width = 256; signCanvas.height = 64;
+  (function () { const c = signCanvas.getContext("2d"); c.fillStyle = "#2a2438"; c.fillRect(0, 0, 256, 64); c.fillStyle = "#ffbf5e"; c.font = "bold 30px 'Gowun Batang', serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("올빼미방", 128, 34); })();
+  const signTex = new THREE.CanvasTexture(signCanvas); signTex.encoding = THREE.sRGBEncoding;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), new THREE.MeshBasicMaterial({ map: signTex })); sign.position.set(-6.4, 3.05, -5.54); scene.add(sign);
+  setTimeout(() => { const c = signCanvas.getContext("2d"); c.fillStyle = "#2a2438"; c.fillRect(0, 0, 256, 64); c.fillStyle = "#ffbf5e"; c.font = "bold 30px 'Gowun Batang', serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("올빼미방", 128, 34); signTex.needsUpdate = true; }, 1500);
+  let doorOpenT = 0, doorAngle = 0;
+
+  // bookshelves on side walls
+  function shelf(x) {
+    const g = new THREE.Group();
+    const wood = lambert("#2f2638");
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 3), wood); back.position.y = 1.6; g.add(back);
+    const bookCols = ["#7a4b4b", "#4b5f7a", "#6b7a4b", "#7a6b4b", "#5b4a72", "#8a7a5a"];
+    for (let r = 0; r < 4; r++) {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 3), wood); plank.position.set(0.05, 0.3 + r * 0.78, 0); g.add(plank);
+      let z = -1.35;
+      while (z < 1.3) {
+        const w = 0.12 + Math.random() * 0.1, hgt = 0.45 + Math.random() * 0.22;
+        const book = new THREE.Mesh(new THREE.BoxGeometry(0.3, hgt, w), lambert(bookCols[Math.floor(Math.random() * bookCols.length)]));
+        book.position.set(0.12, 0.33 + r * 0.78 + hgt / 2, z + w / 2); g.add(book); z += w + 0.02;
+      }
+    }
+    g.position.set(x, 0, 0.5); if (x > 0) g.rotation.y = Math.PI; scene.add(g);
+  }
+  shelf(-8.7); shelf(8.7);
+
+  // desks: 4 x 3, front row first, center seats first
+  const COLS = [-3.9, -1.3, 1.3, 3.9], ROWS = [2.3, -0.1, -2.5];
+  const AISLE_X = -5.7;
+  const SEATS = [];
+  ROWS.forEach((z, r) => [1, 2, 0, 3].forEach((c) => SEATS.push({ x: COLS[c], z, r })));
+
+  const deskMat = lambert("#5a4436"), legMat = lambert("#3a2c25"), chairMat = lambert("#3b2f45");
+  const lampOff = lambert("#3d3550"), lampOn = new THREE.MeshBasicMaterial({ color: "#ffd38a" });
+  const mugGeo = new THREE.CylinderGeometry(0.06, 0.052, 0.12, 12);
+  const mugMats = ["#e8e1d2", "#c9775f", "#6f8fb0", "#d9b26a"].map((c) => lambert(c));
+  const handleGeo = new THREE.TorusGeometry(0.03, 0.009, 6, 10, Math.PI);
+  const spillGeo = new THREE.CircleGeometry(0.16, 16);
+  const spillMat = new THREE.MeshLambertMaterial({ color: "#3b2418", transparent: true, opacity: 0.85 });
+  function rng(seed) { return function () { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const owlState = [];
+  SEATS.forEach((s, i) => {
+    const g = new THREE.Group(); g.position.set(s.x, 0, s.z); scene.add(g);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.09, 0.95), deskMat); top.position.set(0, 0.8, 0.62); g.add(top);
+    [[-0.85, 0.25], [0.85, 0.25], [-0.85, 1.0], [0.85, 1.0]].forEach(([x, z]) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.8, 0.07), legMat); leg.position.set(x, 0.4, z); g.add(leg);
+    });
+    const front = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 0.04), legMat); front.position.set(0, 0.52, 1.08); g.add(front);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.08, 0.7), chairMat); seat.position.set(0, 0.48, -0.05); g.add(seat);
+    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.08), chairMat); backrest.position.set(0, 0.88, -0.42); g.add(backrest);
+    const lap = new THREE.Group(); lap.position.set(-0.05, 0.85, 0.62);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.38), lambert("#8d8a99")); lap.add(base);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.36, 0.025), lambert("#8d8a99")); screen.position.set(0, 0.18, 0.2); screen.rotation.x = 0.2; lap.add(screen);
+    g.add(lap);
+    const note = new THREE.Group(); note.position.set(-0.05, 0.85, 0.6); note.rotation.y = 0.12; note.visible = false;
+    const pageL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.42), lambert("#f1ead9")); pageL.position.x = -0.155; pageL.rotation.z = 0.04; note.add(pageL);
+    const pageR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.42), lambert("#f6f0e2")); pageR.position.x = 0.155; pageR.rotation.z = -0.04; note.add(pageR);
+    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), lambert("#8a7a5a")); spine.rotation.x = Math.PI / 2; spine.position.y = 0.012; note.add(spine);
+    for (let l = 0; l < 6; l++) { const ln = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.002, 0.008), lambert("#a9b6cf")); ln.position.set(-0.155, 0.012, -0.15 + l * 0.06); note.add(ln); const ln2 = ln.clone(); ln2.position.x = 0.155; note.add(ln2); }
+    const pen = new THREE.Group(); pen.position.set(0.17, 0.05, 0.02);
+    const penBody = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 8), lambert("#3d5a8a")); penBody.rotation.set(Math.PI / 2 - 0.5, 0, 0.6); pen.add(penBody);
+    note.add(pen);
+    g.add(note);
+    const phone = new THREE.Group(); phone.position.set(0, 1.42, 0.42); phone.rotation.x = -0.35; phone.visible = false;
+    const phoneBody = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.32, 0.02), lambert("#2b2a33")); phone.add(phoneBody);
+    const phoneScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.29), new THREE.MeshBasicMaterial({ color: "#9fc4ff" })); phoneScreen.position.z = -0.011; phoneScreen.rotation.y = Math.PI; phone.add(phoneScreen);
+    const phoneBack = new THREE.Mesh(new THREE.CircleGeometry(0.018, 10), new THREE.MeshBasicMaterial({ color: "#55546a" })); phoneBack.position.set(-0.045, 0.11, 0.011); phone.add(phoneBack);
+    g.add(phone);
+    const lamp = new THREE.Group(); lamp.position.set(-0.72, 0.85, 0.75);
+    const lb = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.04, 16), lampOff); lamp.add(lb);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.55, 8), lampOff); arm.position.set(0.06, 0.27, -0.05); arm.rotation.z = -0.25; lamp.add(arm);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.16, 16, 1, true), lampOff); head.position.set(0.16, 0.52, -0.05); head.rotation.z = -0.9; lamp.add(head);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), lampOff); bulb.position.set(0.2, 0.48, -0.05); lamp.add(bulb);
+    g.add(lamp);
+    const light = new THREE.PointLight("#ffb35a", 0, 3.6, 2); light.position.set(-0.45, 1.35, 0.7); g.add(light);
+    // up to 20 mugs, scattered: they creep across the desk, pile up, and end up on the floor
+    const mugs = [];
+    const rnd = rng(i * 977 + 13);
+    const placed = [];
+    const blocked = (x, z) => (x > -0.38 && x < 0.3 && z > 0.38 && z < 0.9) || (x < -0.5 && z > 0.55 && z < 0.95);
+    for (let m = 0; m < MAX_COFFEE; m++) {
+      const mug = new THREE.Group();
+      const cup = new THREE.Mesh(mugGeo, mugMats[Math.floor(rnd() * 4)]); mug.add(cup);
+      const handle = new THREE.Mesh(handleGeo, cup.material); handle.position.set(0.065, 0, 0); handle.rotation.x = Math.PI / 2; mug.add(handle);
+      let done = false;
+      const floorChance = m < 6 ? 0 : m < 10 ? 0.25 : 0.4;
+      if (rnd() < floorChance) {
+        // knocked over on the floor, some with a little spill
+        const side = rnd() < 0.5 ? -1 : 1;
+        const fx = rnd() < 0.6 ? side * (1.0 + rnd() * 0.35) : (rnd() - 0.5) * 1.8;
+        const fz = fx > -0.95 && fx < 0.95 ? 1.2 + rnd() * 0.4 : -0.3 + rnd() * 1.5;
+        mug.position.set(fx, 0.06, fz); mug.rotation.set(0, rnd() * 6.28, Math.PI / 2);
+        if (rnd() < 0.45) {
+          const spill = new THREE.Mesh(spillGeo, spillMat); spill.rotation.x = -Math.PI / 2; spill.scale.set(0.8 + rnd() * 0.8, 0.6 + rnd() * 0.6, 1);
+          spill.position.set(fx + (rnd() - 0.5) * 0.15, 0.004, fz + (rnd() - 0.5) * 0.15); spill.rotation.z = rnd() * 6.28;
+          spill.visible = false; g.add(spill); mug.userData.spill = spill;
+        }
+        done = true;
+      }
+      if (!done && placed.length && rnd() < (m < 6 ? 0.1 : 0.3)) {
+        // stacked on top of another mug
+        const base = placed[Math.floor(rnd() * placed.length)];
+        base.h += 1;
+        mug.position.set(base.x + (rnd() - 0.5) * 0.02, 0.905 + base.h * 0.122, base.z + (rnd() - 0.5) * 0.02);
+        mug.rotation.set((rnd() - 0.5) * 0.08, rnd() * 6.28, (rnd() - 0.5) * 0.08);
+        done = true;
+      }
+      for (let tries = 0; !done && tries < 14; tries++) {
+        const right = m < 5 ? true : rnd() < 0.55;
+        const x = right ? 0.35 + rnd() * 0.55 : -0.9 + rnd() * 0.85;
+        const z = 0.2 + rnd() * 0.85;
+        if (blocked(x, z) || placed.some((q) => Math.hypot(q.x - x, q.z - z) < 0.15)) continue;
+        mug.position.set(x, 0.905, z); mug.rotation.y = rnd() * 6.28;
+        placed.push({ x, z, h: 0 }); done = true;
+      }
+      if (!done) { mug.position.set(0.6, 0.06, 1.35); mug.rotation.set(0, rnd() * 6.28, Math.PI / 2); }
+      mug.visible = false; g.add(mug); mugs.push(mug);
+    }
+    owlState.push({ group: g, lap, note, pen, phone, bulb, head, light, mugs, sfx: { mode: "pause", until: 0, next: 0, click: 0 }, owl: null, colorIdx: -1, occupant: null, entry: null, walk: null, jumpT: 0, sipT: 0, blinkT: Math.random() * 4, hearts: [] });
+  });
+
+  // owl model
+  function makeOwl(f) {
+    const o = new THREE.Group();
+    const bodyM = lambert(f.body), bellyM = lambert(f.belly);
+    const eyeW = lambert("#f4eee0"), pupilM = new THREE.MeshBasicMaterial({ color: "#14111d" }), beakM = lambert("#f0a94a");
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 18), bodyM); body.scale.set(1, 1.08, 0.9); body.position.y = 0.55; o.add(body);
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.37, 20, 14), bellyM); belly.scale.set(1, 1.1, 0.5); belly.position.set(0, 0.48, 0.28); o.add(belly);
+    const head = new THREE.Group(); head.position.y = 1.12; o.add(head);
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.43, 24, 18), bodyM); skull.scale.set(1.08, 0.92, 0.92); head.add(skull);
+    const eyes = new THREE.Group(); head.add(eyes);
+    [-1, 1].forEach((side) => {
+      const disc = new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 14), bellyM); disc.scale.set(1, 1, 0.45); disc.position.set(side * 0.17, 0.02, 0.32); head.add(disc);
+      const w = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 14), eyeW); w.scale.set(1, 1, 0.5); w.position.set(side * 0.17, 0.03, 0.37); eyes.add(w);
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), pupilM); p.position.set(side * 0.17, 0.03, 0.42); eyes.add(p);
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 10), bodyM); tuft.position.set(side * 0.28, 0.38, -0.02); tuft.rotation.z = -side * 0.45; head.add(tuft);
+    });
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.13, 10), beakM); beak.rotation.x = Math.PI; beak.position.set(0, -0.09, 0.42); head.add(beak);
+    const wings = [-1, 1].map((side) => {
+      const pivot = new THREE.Group(); pivot.position.set(side * 0.44, 0.85, 0); o.add(pivot);
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), bodyM); wing.scale.set(0.32, 0.95, 0.75); wing.position.y = -0.3; pivot.add(wing);
+      return pivot;
+    });
+    const feet = [-1, 1].map((side) => {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.18), beakM); foot.position.set(side * 0.18, 0.03, 0.12); o.add(foot); return foot;
+    });
+    o.userData = { head, eyes, wings, body, feet };
+    return o;
+  }
+
+  // walking in from the door, then hopping onto the chair
+  function startWalk(st, seatIdx) {
+    const s = SEATS[seatIdx];
+    const rowZ = s.z - 0.98;
+    const pts = [[DOOR.x, DOOR.z + 0.1], [DOOR.x, -4.4], [AISLE_X, -4.4], [AISLE_X, rowZ], [s.x, rowZ]];
+    st.walk = { pts: pts.map(([x, z]) => new THREE.Vector3(x - s.x, 0, z - s.z)), seg: 0, segT: 0, hop: 0, phase: "walk", t: 0 };
+    st.owl.position.copy(st.walk.pts[0]);
+    doorOpenT = 3.2;
+  }
+  function startExit(st, seatIdx, onDone, stroll) {
+    if (!st.owl) { if (onDone) onDone(); return; }
+    const s = SEATS[seatIdx];
+    const rowZ = s.z - 0.98;
+    const pts = [[s.x, rowZ], [AISLE_X, rowZ], [AISLE_X, -4.4], [DOOR.x, -4.4], [DOOR.x, DOOR.z + 0.1]];
+    st.walk = null;
+    st.exit = { stroll: !!stroll, phase: "doze", t: 0, zT: 0, pts: pts.map(([x, z]) => new THREE.Vector3(x - s.x, 0, z - s.z)), seg: 0, segT: 0, onDone };
+    st.phone.visible = false; st.note.visible = false; st.lap.visible = true;
+    if (!st.bubble) { st.bubble = document.createElement("div"); st.bubble.className = "bubble"; labelsEl.appendChild(st.bubble); }
+    st.bubble.textContent = stroll ? "바람 좀 쐬고 올게요" : "저 먼저 잡니다.. 수고하세요..";
+    st.bubble.hidden = false;
+  }
+  function stepExit(st, dt) {
+    const x = st.exit, o = st.owl, u = o.userData;
+    x.t += dt;
+    if (!x.stroll) {
+      u.eyes.scale.y = 0.12;
+      x.zT -= dt;
+      if (x.zT < 0 && x.phase !== "gone") { spawnZ(st); x.zT = 0.8; }
+    }
+    if (x.phase === "doze" && x.stroll) {
+      // stretch both wings, then get up
+      const k = Math.min(1, x.t / 1.2);
+      u.wings[0].rotation.set(0, 0, -Math.sin(k * Math.PI) * 2.2); u.wings[1].rotation.set(0, 0, Math.sin(k * Math.PI) * 2.2);
+      u.head.rotation.set(-0.3 * Math.sin(k * Math.PI), 0, 0);
+      o.position.set(0, 0.5, -0.02);
+      if (x.t > 1.4) { x.phase = "hop"; x.t = 0; }
+    } else if (x.phase === "doze") {
+      // nodding off at the desk
+      u.head.rotation.set(0.15 + Math.max(0, Math.sin(x.t * 2.4)) * 0.45, 0, Math.sin(x.t * 1.2) * 0.12);
+      o.position.set(0, 0.5, -0.02);
+      u.wings[0].rotation.set(0, 0, -0.1); u.wings[1].rotation.set(0, 0, 0.1);
+      if (x.t > (reduceMotion ? 1.5 : 3)) { x.phase = "hop"; x.t = 0; setLamp(st, false); }
+    } else if (x.phase === "hop") {
+      const k = Math.min(1, x.t / 0.8);
+      const to = x.pts[0];
+      o.position.set(to.x * k, 0.5 * (1 - k) + Math.sin(k * Math.PI) * 0.3, -0.02 + (to.z + 0.02) * k);
+      o.rotation.y = Math.PI * k;
+      u.head.rotation.set(0.35, 0, 0);
+      if (k >= 1) { x.phase = "walk"; x.t = 0; }
+    } else if (x.phase === "walk") {
+      const a = x.pts[x.seg], b = x.pts[x.seg + 1];
+      const len = a.distanceTo(b) || 0.001;
+      x.segT += (dt * (x.stroll ? 2.2 : 1.35)) / len;
+      if (x.segT >= 1) {
+        x.segT = 0; x.seg += 1;
+        if (x.seg >= x.pts.length - 1) { x.phase = "gone"; x.t = 0; return; }
+      }
+      if (x.seg >= x.pts.length - 3) doorOpenT = Math.max(doorOpenT, 1.5);
+      const p0 = x.pts[x.seg], p1 = x.pts[x.seg + 1];
+      o.position.lerpVectors(p0, p1, x.segT);
+      dir.subVectors(p1, p0);
+      const want = Math.atan2(dir.x, dir.z);
+      let diff = want - o.rotation.y; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
+      o.rotation.y += diff * Math.min(1, dt * 6);
+      // drowsy shuffle: slow, swaying, head bobbing
+      const ph = x.t * (x.stroll ? 11 : 6);
+      if (x.stroll) {
+        o.position.y = Math.abs(Math.sin(ph)) * 0.07; o.rotation.z = Math.sin(ph) * 0.14;
+        u.head.rotation.set(0, 0, 0);
+      } else {
+        o.position.y = Math.abs(Math.sin(ph)) * 0.04;
+        o.rotation.z = Math.sin(ph * 0.5) * 0.2;
+        u.head.rotation.set(0.25 + Math.max(0, Math.sin(x.t * 1.8)) * 0.4, 0, Math.sin(ph * 0.5) * 0.15);
+      }
+      u.feet[0].position.z = 0.12 + Math.sin(ph) * 0.07; u.feet[1].position.z = 0.12 - Math.sin(ph) * 0.07;
+      u.wings[0].rotation.set(0, 0, -0.05); u.wings[1].rotation.set(0, 0, 0.05);
+      if (x.t > 3.5 && st.bubble) st.bubble.hidden = true;
+    } else if (x.phase === "gone") {
+      // slip out through the doorway
+      const k = Math.min(1, x.t / 0.6);
+      o.scale.setScalar(1 - k);
+      o.position.z -= dt * 0.6;
+      doorOpenT = Math.max(doorOpenT, 0.8);
+      if (k >= 1) {
+        const cb = x.onDone;
+        if (x.stroll) { st.group.remove(o); st.owl = null; st.exit = null; st.away = true; if (st.bubble) st.bubble.hidden = true; setLamp(st, true); }
+        else clearSeat(st);
+        if (cb) cb();
+      }
+    }
+  }
+  function seatOwl(st) {
+    st.walk = null;
+    st.owl.position.set(0, 0.5, -0.02);
+    st.owl.rotation.set(0, 0, 0);
+  }
+
+  // hearts that float up on a cheer
+  const heartCanvas = document.createElement("canvas"); heartCanvas.width = heartCanvas.height = 64;
+  (function () { const c = heartCanvas.getContext("2d"); c.fillStyle = "#ffbf5e"; c.beginPath(); c.moveTo(32, 54); c.bezierCurveTo(4, 34, 10, 8, 32, 22); c.bezierCurveTo(54, 8, 60, 34, 32, 54); c.fill(); })();
+  const heartTex = new THREE.CanvasTexture(heartCanvas);
+  const zCanvas = document.createElement("canvas"); zCanvas.width = zCanvas.height = 64;
+  (function () { const c = zCanvas.getContext("2d"); c.fillStyle = "#cfc8ea"; c.font = "bold 44px 'IBM Plex Mono', monospace"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("z", 32, 34); })();
+  const zTex = new THREE.CanvasTexture(zCanvas);
+  function spawnZ(st) {
+    if (!st.owl) return;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: zTex, transparent: true, depthWrite: false }));
+    const sc = 0.18 + Math.random() * 0.14; sp.scale.set(sc, sc, 1);
+    sp.position.set(st.owl.position.x + 0.3, st.owl.position.y + 1.65, st.owl.position.z);
+    sp.userData = { life: 0, delay: 0, vx: 0.25 };
+    st.group.add(sp); st.hearts.push(sp);
+  }
+  function spawnHearts(st) {
+    if (!st.owl) return;
+    for (let i = 0; i < 5; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: heartTex, transparent: true, depthWrite: false }));
+      s.scale.set(0.28, 0.28, 1);
+      s.position.set(st.owl.position.x + (Math.random() - 0.5) * 0.7, st.owl.position.y + 1.6 + Math.random() * 0.2, st.owl.position.z);
+      s.userData = { life: 0, delay: i * 0.12, vx: (Math.random() - 0.5) * 0.3 };
+      st.group.add(s); st.hearts.push(s);
+    }
+  }
+
+
+  // ---------- network: Supabase Realtime (per floor) + seat table ----------
+  const CFG = window.OWL_CONFIG || {};
+  const CAP = Number(CFG.cap) || 160;
+  const sb = CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase
+    ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+    : null;
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 3) | 8).toString(16); });
+  }
+  const clientId = uuid();               // secret: my row in the seat table
+  const pk = uuid().replace(/-/g, "").slice(0, 12); // public: my key on floor channels
+  const net = sb ? (function () {
+    const chans = new Map();             // floor -> { ch, state, ready }
+    let mine = null, myFloor = null, pending = false, rows = [], warned = false;
+    let tokens = 4;                      // Supabase free: 5 presence calls per client per 30 s
+    setInterval(() => { tokens = Math.min(4, tokens + 1); }, 7500);
+    const changed = [], cheers = [];
+    const fire = () => changed.forEach((fn) => fn());
+    function trouble() {
+      if (warned) return; warned = true;
+      showToast("사람이 많아서 연결이 불안정해요. 잠시 뒤 새로고침해주세요.");
+      setTimeout(() => (warned = false), 30000);
+    }
+    function chan(f) {
+      let c = chans.get(f);
+      if (c) return c;
+      const ch = sb.channel("owl-floor-" + f, { config: { presence: { key: pk }, broadcast: { self: false } } });
+      c = { ch, state: {}, ready: false };
+      ch.on("presence", { event: "sync" }, () => { c.state = ch.presenceState(); fire(); });
+      ch.on("broadcast", { event: "cheer" }, (msg) => cheers.forEach((fn) => fn(msg.payload || {}, f)));
+      ch.subscribe((status) => {
+        if (status === "SUBSCRIBED") { c.ready = true; if (myFloor === f && mine) pending = true; }
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") { c.ready = false; trouble(); }
+      });
+      chans.set(f, c);
+      return c;
+    }
+    function keep() {
+      const want = [viewFloor]; if (myFloor != null && !want.includes(myFloor)) want.push(myFloor);
+      chans.forEach((c, f) => { if (!want.includes(f)) { sb.removeChannel(c.ch); chans.delete(f); } });
+      want.forEach(chan);
+    }
+    // presence updates are coalesced: only the latest state goes out when a token is free
+    setInterval(() => {
+      if (!pending || !mine || myFloor == null || tokens < 1) return;
+      const c = chans.get(myFloor);
+      if (!c || !c.ready) return;
+      tokens -= 1; pending = false;
+      c.ch.track(Object.assign({}, mine)).catch(() => { pending = true; });
+    }, 400);
+    async function rpc(fn, args) { const r = await sb.rpc(fn, args); if (r.error) throw r.error; return r.data; }
+    let beatSoonT = 0;
+    async function beat() {
+      if (!mine) return;
+      try {
+        const ok = await rpc("owl_beat", { p_client: clientId, p_name: me.name, p_color: me.color, p_outside: !!mine.outside });
+        if (ok !== true && entered && !leaving) {
+          // the seat timed out (tab slept); grab one again
+          const r = await rpc("owl_claim", { p_client: clientId, p_name: me.name, p_color: me.color });
+          if (r && r.ok && (r.floor !== me.floor || r.seat !== me.seat)) {
+            me.floor = r.floor; me.seat = r.seat; meWalkPending = true;
+            api.update({ floor: me.floor, seat: me.seat });
+            myFloor = me.floor; keep();
+            if (viewFloor !== me.floor) setViewFloor(me.floor);
+          }
+        }
+      } catch (e) {}
+      refresh();
+    }
+    async function refresh() {
+      try { const d = await rpc("owl_building", {}); if (Array.isArray(d)) { rows = d; fire(); } } catch (e) {}
+    }
+    setInterval(() => { if (mine) beat(); }, 30000);
+    setInterval(() => { if (!mine) refresh(); }, 15000);
+    setInterval(() => { if (mine) refresh(); }, 15000);
+    refresh();
+    window.addEventListener("pagehide", () => {
+      if (!mine) return;
+      try {
+        fetch(CFG.supabaseUrl.replace(/\/$/, "") + "/rest/v1/rpc/owl_leave", {
+          method: "POST", keepalive: true,
+          headers: { apikey: CFG.supabaseAnonKey, Authorization: "Bearer " + CFG.supabaseAnonKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_client: clientId })
+        });
+      } catch (e) {}
+    });
+    const api = {
+      key: pk,
+      rows: () => rows,
+      floorState(f) { const c = chans.get(f); return c ? c.state : {}; },
+      view() { keep(); },
+      async claim() { return rpc("owl_claim", { p_client: clientId, p_name: me.name, p_color: me.color }); },
+      sit(state) { mine = Object.assign({}, state); myFloor = state.floor; keep(); pending = true; refresh(); },
+      update(patch) {
+        if (!mine) return;
+        Object.keys(patch).forEach((k) => { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; });
+        pending = true;
+        if ("outside" in patch || "name" in patch || "color" in patch) { clearTimeout(beatSoonT); beatSoonT = setTimeout(beat, 800); }
+      },
+      async leave() {
+        const c = myFloor != null ? chans.get(myFloor) : null;
+        mine = null; pending = false; myFloor = null;
+        if (c) { try { await c.ch.untrack(); } catch (e) {} }
+        keep();
+        try { await rpc("owl_leave", { p_client: clientId }); } catch (e) {}
+        refresh();
+      },
+      cheer(to, name) {
+        const c = chans.get(viewFloor);
+        if (c && c.ready) c.ch.send({ type: "broadcast", event: "cheer", payload: { to, from: pk, name } }).catch(() => {});
+      },
+      onChange(fn) { changed.push(fn); },
+      onCheer(fn) { cheers.push(fn); }
+    };
+    return api;
+  })() : null;
+
+  // ---------- seats ----------
+  function norm(peer, pr) {
+    return {
+      peer, isMe: false,
+      name: clean(pr.name, 12) || "이름 없는 올빼미",
+      job: clean(pr.job, 14),
+      color: Number.isInteger(pr.color) && pr.color >= 0 && pr.color < FEATHERS.length ? pr.color : 0,
+      status: STATUS_LABEL[pr.status] ? pr.status : "work",
+      coffee: Number.isFinite(pr.coffee) ? Math.max(0, Math.min(MAX_COFFEE, pr.coffee | 0)) : 0,
+      since: Number.isFinite(pr.since) ? pr.since : 0,
+      seat: Number.isInteger(pr.seat) && pr.seat >= 0 && pr.seat < SEATS.length ? pr.seat : -1,
+      floor: Number.isInteger(pr.floor) && pr.floor >= 2 && pr.floor < 100 ? pr.floor : 2,
+      leaving: !!pr.leaving,
+      outside: !!pr.outside
+    };
+  }
+  function others() {
+    const list = [];
+    if (!net) return list;
+    const seen = new Set();
+    const state = net.floorState(viewFloor);
+    Object.keys(state).forEach((k) => {
+      if (k === net.key) return;
+      const metas = state[k] || [];
+      const pr = metas[metas.length - 1] || {};
+      if (!pr.name || !Number.isFinite(pr.since)) return;
+      const o = norm(k, pr);
+      if (o.floor !== viewFloor || o.seat < 0) return;
+      list.push(o); seen.add(o.floor + ":" + o.seat);
+    });
+    net.rows().forEach((r) => {
+      const at = r.floor + ":" + r.seat;
+      if (seen.has(at) || r.floor === viewFloor) return;
+      if (entered && r.floor === me.floor && r.seat === me.seat) return;
+      list.push(norm("db:" + at, { name: r.name, color: r.color, floor: r.floor, seat: r.seat, outside: r.outside, since: Date.parse(r.since) || 0 }));
+    });
+    return list;
+  }
+  function earlier(a, b) { return a.since < b.since || (a.since === b.since && a.peer < b.peer); }
+  let viewFloor = 2, switchedAt = 0, meWalkPending = false;
+  function setViewFloor(f) {
+    if (f === viewFloor) return;
+    viewFloor = f; switchedAt = Date.now();
+    owlState.forEach((st) => { st.hearts.forEach((h) => st.group.remove(h)); st.hearts = []; clearSeat(st); });
+    $("floorLabel").textContent = "밤에만 불 켜지는 건물 · " + f + "층";
+    if (net) net.view();
+    sync();
+  }
+  function seatOf(key) {
+    for (let i = 0; i < owlState.length; i++) {
+      const e = owlState[i].entry;
+      if (e && (key === "me" ? e.isMe : e.peer === key)) return { seat: i, entry: e };
+    }
+    return null;
+  }
+
+  const labelsEl = $("labels");
+  let total = 0, floorCount = 0;
+  let lastList = [];
+  function floorCounts(list) {
+    const counts = {};
+    list.forEach((o) => { if (o.seat >= 0) counts[o.floor] = (counts[o.floor] || 0) + 1; });
+    if (entered && me.seat >= 0) counts[me.floor] = (counts[me.floor] || 0) + 1;
+    return counts;
+  }
+  function renderFloorMenu() {
+    const counts = floorCounts(lastList);
+    const top = Math.max(2, ...Object.keys(counts).map(Number));
+    const el = $("floorMenu"); el.textContent = "";
+    const t = document.createElement("div"); t.className = "label"; t.textContent = "어느 층을 구경할까요?"; el.appendChild(t);
+    for (let f = 2; f <= top + 1; f++) {
+      const b = document.createElement("button"); b.type = "button"; b.id = "goto-" + f;
+      if (f === viewFloor) b.setAttribute("aria-current", "true");
+      const name = document.createElement("b"); name.textContent = f + "층"; name.style.fontWeight = "600";
+      const info = document.createElement("span");
+      info.textContent = (counts[f] || 0) + "/" + SEATS.length;
+      if (entered && f === me.floor) { const m = document.createElement("span"); m.className = "mine"; m.textContent = " · 내 자리"; info.appendChild(m); }
+      if (f === viewFloor) info.append(" · 보는 중");
+      b.append(name, info);
+      b.addEventListener("click", () => { el.hidden = true; $("floorsBtn").setAttribute("aria-expanded", "false"); setViewFloor(f); });
+      el.appendChild(b);
+    }
+  }
+
+  function sync() {
+    const list = others();
+    const bySeat = new Array(SEATS.length).fill(null);
+    list.forEach((o) => { if (o.floor === viewFloor && o.seat >= 0 && (!bySeat[o.seat] || earlier(o, bySeat[o.seat]))) bySeat[o.seat] = o; });
+    if (entered && me.seat >= 0 && me.floor === viewFloor) bySeat[me.seat] = { peer: "me", isMe: true, outside: mode === "outside" || strolling, name: me.name, job: me.job, color: me.color, status: me.status, coffee: me.coffee, since: me.since, seat: me.seat };
+    total = list.length + (entered ? 1 : 0);
+    floorCount = list.filter((o) => o.floor === viewFloor).length + (entered && me.floor === viewFloor ? 1 : 0);
+    lastList = list;
+    if (!$("floorMenu").hidden) renderFloorMenu();
+    if (streetBuilt) updateStreet(list);
+
+    owlState.forEach((st, i) => {
+      let e = bySeat[i];
+      if (e && e.leaving && !st.exit && st.occupant !== e.peer) e = null; // already gone, don't walk back in
+      if (st.exit) { if (e) st.entry = e; setLamp(st, !!st.exit.stroll); return; } // let the exit finish
+      st.entry = e;
+      if (e && e.outside) {
+        // out for a walk: the owl leaves, the lamp and the mess stay
+        if (st.occupant !== e.peer) { if (st.owl) { st.group.remove(st.owl); st.owl = null; } st.occupant = e.peer; st.colorIdx = e.color; st.away = true; }
+        else if (st.owl && !st.away) { startExit(st, i, null, true); }
+        showDesk(st, e, i);
+        st.phone.visible = false; st.note.visible = e.status === "study"; st.lap.visible = e.status !== "study";
+        setLamp(st, true);
+        return;
+      }
+      if (e && st.away && st.occupant === e.peer) {
+        // back from the walk
+        st.away = false; st.returning = true;
+        st.owl = makeOwl(FEATHERS[e.color]); st.colorIdx = e.color; st.group.add(st.owl);
+        if (!reduceMotion) startWalk(st, i); else seatOwl(st);
+        if (e.isMe) meWalkPending = false;
+      }
+      if (e) {
+        const newcomer = st.occupant !== e.peer;
+        if (newcomer || st.colorIdx !== e.color || !st.owl) {
+          const pos = st.owl && !newcomer ? st.owl.position.clone() : null;
+          const walk = !newcomer ? st.walk : null;
+          if (st.owl) st.group.remove(st.owl);
+          st.owl = makeOwl(FEATHERS[e.color]); st.colorIdx = e.color; st.group.add(st.owl);
+          if (newcomer) {
+            st.occupant = e.peer;
+            const arriving = e.isMe ? meWalkPending : e.since > Math.max(loadedAt, switchedAt) - 2500;
+            if (e.isMe) meWalkPending = false;
+            if (arriving && !reduceMotion) startWalk(st, i); else seatOwl(st);
+          } else { st.walk = walk; if (pos) st.owl.position.copy(pos); if (!walk) seatOwl(st); }
+        }
+        st.owl.visible = true;
+        st.note.visible = e.status === "study"; st.phone.visible = e.status === "awake" && !st.walk; st.lap.visible = e.status !== "study" && e.status !== "awake";
+        showDesk(st, e, i);
+      } else clearSeat(st);
+      setLamp(st, !!e && (!st.walk || st.returning));
+    });
+    renderMood();
+  }
+  function showDesk(st, e, i) {
+    st.mugs.forEach((m, k) => { m.visible = k < e.coffee; if (m.userData.spill) m.userData.spill.visible = m.visible; });
+    if (!st.tag) {
+      st.tag = document.createElement("div"); st.tag.className = "tag";
+      st.tag.innerHTML = "<b></b><span class=\"job\"></span><i></i>";
+      st.tag.addEventListener("click", () => cheerSeat(i));
+      labelsEl.appendChild(st.tag);
+    }
+    st.tag.hidden = false;
+    st.tag.classList.toggle("me", e.isMe);
+    st.tag.querySelector("b").textContent = e.name;
+    st.tag.querySelector(".job").textContent = e.job || "";
+    st.tag.querySelector("i").textContent = (e.outside ? "산책 중" : STATUS_LABEL[e.status]) + (e.coffee ? " · 커피 " + e.coffee : "");
+  }
+  function clearSeat(st) {
+    st.away = false;
+    if (st.owl) { st.group.remove(st.owl); st.owl = null; }
+    st.occupant = null; st.walk = null; st.exit = null; st.colorIdx = -1; st.entry = null;
+    st.mugs.forEach((m) => { m.visible = false; if (m.userData.spill) m.userData.spill.visible = false; });
+    st.note.visible = false; st.phone.visible = false; st.lap.visible = true;
+    if (st.tag) st.tag.hidden = true;
+    if (st.bubble) st.bubble.hidden = true;
+  }
+  function setLamp(st, on) {
+    st.light.intensity = on ? 1.6 : 0;
+    st.bulb.material = on ? lampOn : lampOff;
+    st.head.material = on ? lampOn : lampOff;
+  }
+
+  function cheerSeat(i) {
+    const st = owlState[i];
+    if (!st.entry || st.entry.isMe) return;
+    if (!entered) { showToast("먼저 책상에 앉아야 응원할 수 있어요."); return; }
+    if (Date.now() < cheerCooldown) return;
+    cheerCooldown = Date.now() + 2000;
+    st.jumpT = 0.7; spawnHearts(st);
+    showToast(st.entry.name + "님에게 응원을 보냈어요.");
+    if (net && !String(st.entry.peer).startsWith("db:")) net.cheer(st.entry.peer, me.name);
+  }
+
+  function onFloorChange() {
+    if (!net) return;
+    const state = net.floorState(viewFloor);
+    Object.keys(state).forEach((k) => {
+      if (k === net.key) return;
+      const metas = state[k] || [];
+      const pr = metas[metas.length - 1] || {};
+      if (Number.isFinite(pr.coffee)) {
+        if (lastCoffee[k] !== undefined && pr.coffee > lastCoffee[k]) { const s = seatOf(k); if (s) owlState[s.seat].sipT = 1.2; }
+        lastCoffee[k] = pr.coffee;
+      }
+      if (pr.leaving) {
+        const s = seatOf(k);
+        if (s && !owlState[s.seat].exit && owlState[s.seat].owl) startExit(owlState[s.seat], s.seat, null);
+      }
+    });
+  }
+  function onCheer(p, floor) {
+    if (!p || typeof p.to !== "string") return;
+    const toMe = p.to === net.key;
+    if (floor !== viewFloor && !toMe) return;
+    const s = toMe ? seatOf("me") : seatOf(p.to);
+    if (s && floor === viewFloor) { owlState[s.seat].jumpT = 0.7; spawnHearts(owlState[s.seat]); }
+    if (toMe) { showToast((clean(p.name, 12) || "누군가") + "님이 응원을 보냈어요."); hootSound(); }
+  }
+
+  // ---------- mood + clock ----------
+  function renderMood() {
+    const m = $("mood"); m.textContent = "";
+    const h = new Date().getHours();
+    if (h >= 6 && h < 9) { const s = document.createElement("span"); s.className = "stamp"; s.textContent = "오늘 밤도 버텼다"; m.appendChild(s); }
+    const line = document.createElement("span");
+    if (mode === "outside") {
+      const counts = floorCounts(lastList);
+      const litN = Object.values(counts).reduce((a, b) => a + b, 0);
+      line.textContent = "건물 앞을 산책 중이에요 · 불 켜진 창 " + litN + "개";
+    } else if (total === 0) line.textContent = "아직 아무도 없어요. 첫 스탠드를 켜보세요.";
+    else if (!net) line.textContent = "지금은 나 혼자 불 켜두고 있어요.";
+    else {
+      const visiting = !entered || me.floor !== viewFloor;
+      line.append(visiting && entered ? viewFloor + "층 구경 중 · " : "이 층에 ");
+      const c = document.createElement("span"); c.className = "count"; c.textContent = floorCount + "마리"; line.append(c);
+      line.append(total > floorCount ? " · 건물 전체 " + total + "마리 깨어 있어요." : " 깨어 있어요.");
+    }
+    const sub = document.createElement("span"); sub.className = "sub";
+    sub.textContent = h >= 21 ? "문 열었어요." : h < 4 ? "한밤중, 천천히 해요." : h < 6 ? "새벽이에요, 조금만 더." : h < 9 ? "해 떴어요, 이제 자도 돼요." : "불 켜기 전이지만 먼저 와도 돼요.";
+    m.append(line, sub);
+  }
+  function tick() {
+    const d = new Date();
+    $("clock").firstChild.nodeValue = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    if (entered) $("elapsed").textContent = fmtElapsed(Date.now() - me.since);
+  }
+  setInterval(() => { tick(); renderMood(); }, 20000); tick(); renderMood();
+
+  // ---------- camera controls ----------
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    orbit.minD = w / h < 0.8 ? 15 : 9; orbit.maxD = w / h < 0.8 ? 28 : 19;
+    if (!orbit.touched) orbit.dist = mode === "outside" ? (w / h < 0.8 ? 34 : 21) : (w / h < 0.8 ? 23 : 14);
+    if (mode === "outside") { orbit.minD = 12; orbit.maxD = 45; }
+    orbit.dist = Math.min(orbit.maxD, Math.max(orbit.minD, orbit.dist));
+  }
+  window.addEventListener("resize", resize); resize();
+
+  const pointers = new Map(); let downAt = null, pinch0 = 0;
+  stage.addEventListener("pointerdown", (e) => {
+    stage.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) downAt = { x: e.clientX, y: e.clientY, moved: 0 };
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); }
+  });
+  stage.addEventListener("pointermove", (e) => {
+    const prev = pointers.get(e.pointerId); if (!prev) return;
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) {
+      if (downAt) downAt.moved += Math.abs(dx) + Math.abs(dy);
+      orbit.yaw = Math.max(-0.75, Math.min(0.75, orbit.yaw - dx * 0.005));
+      orbit.pitch = Math.max(0.18, Math.min(1.05, orbit.pitch + dy * 0.004));
+      stage.style.cursor = "grabbing";
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch0) { orbit.dist = Math.min(orbit.maxD, Math.max(orbit.minD, orbit.dist * pinch0 / d)); orbit.touched = true; }
+      pinch0 = d; if (downAt) downAt.moved = 99;
+    }
+  });
+  function up(e) {
+    pointers.delete(e.pointerId); stage.style.cursor = "grab";
+    if (downAt && downAt.moved < 6 && pointers.size === 0) pick(e.clientX, e.clientY);
+    if (pointers.size === 0) downAt = null;
+  }
+  stage.addEventListener("pointerup", up);
+  stage.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); downAt = null; });
+  stage.addEventListener("wheel", (e) => { e.preventDefault(); orbit.touched = true; orbit.dist = Math.min(orbit.maxD, Math.max(orbit.minD, orbit.dist + e.deltaY * 0.01)); }, { passive: false });
+
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  function pick(x, y) {
+    if (mode === "outside") return;
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const owls = owlState.filter((s) => s.owl && s.owl.visible).map((s) => s.owl);
+    const hit = ray.intersectObjects(owls, true)[0];
+    if (!hit) return;
+    let o = hit.object; while (o.parent && !owls.includes(o)) o = o.parent;
+    const i = owlState.findIndex((s) => s.owl === o);
+    if (i >= 0) cheerSeat(i);
+  }
+
+  // ---------- animation loop ----------
+  const clock = new THREE.Clock(), tmp = new THREE.Vector3(), dir = new THREE.Vector3();
+  const WALK_SPEED = 2.4, HOP_TIME = 0.6;
+  function stepWalk(st, dt, i) {
+    const w = st.walk, o = st.owl, u = o.userData;
+    w.t += dt;
+    if (w.phase === "walk") {
+      const a = w.pts[w.seg], b = w.pts[w.seg + 1];
+      const len = a.distanceTo(b) || 0.001;
+      w.segT += (dt * WALK_SPEED) / len;
+      if (w.segT >= 1) { w.segT = 0; w.seg += 1; if (w.seg >= w.pts.length - 1) { w.phase = "turn"; w.hop = 0; o.position.copy(b); return; } }
+      const p0 = w.pts[w.seg], p1 = w.pts[w.seg + 1];
+      o.position.lerpVectors(p0, p1, w.segT);
+      dir.subVectors(p1, p0);
+      const want = Math.atan2(dir.x, dir.z);
+      let diff = want - o.rotation.y; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
+      o.rotation.y += diff * Math.min(1, dt * 10);
+      // waddle
+      const ph = w.t * 11;
+      o.position.y = Math.abs(Math.sin(ph)) * 0.07;
+      o.rotation.z = Math.sin(ph) * 0.14;
+      u.feet[0].position.z = 0.12 + Math.sin(ph) * 0.1; u.feet[1].position.z = 0.12 - Math.sin(ph) * 0.1;
+      u.wings[0].rotation.z = -0.25 - Math.abs(Math.sin(ph)) * 0.2; u.wings[1].rotation.z = 0.25 + Math.abs(Math.sin(ph)) * 0.2;
+    } else if (w.phase === "turn") {
+      // face the desk, then hop onto the chair
+      let diff = 0 - o.rotation.y; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
+      o.rotation.y += diff * Math.min(1, dt * 8); o.rotation.z *= 0.8;
+      u.wings[0].rotation.z *= 0.8; u.wings[1].rotation.z *= 0.8;
+      if (Math.abs(diff) < 0.05) { w.phase = "hop"; w.hop = 0; w.from = o.position.clone(); }
+    } else if (w.phase === "hop") {
+      w.hop += dt / HOP_TIME;
+      const k = Math.min(1, w.hop);
+      const to = tmp.set(0, 0.5, -0.02);
+      o.position.x = w.from.x + (to.x - w.from.x) * k;
+      o.position.z = w.from.z + (to.z - w.from.z) * k;
+      o.position.y = w.from.y + (to.y - w.from.y) * k + Math.sin(k * Math.PI) * 0.55;
+      u.wings[0].rotation.z = -Math.sin(k * Math.PI) * 1.4; u.wings[1].rotation.z = Math.sin(k * Math.PI) * 1.4;
+      if (k >= 1) {
+        seatOwl(st);
+        setLamp(st, true);
+        st.jumpT = 0;
+        const e = st.entry;
+        if (e && !st.returning) showToast(e.isMe ? "내 책상에 스탠드가 켜졌어요." : e.name + "님 책상에 불이 켜졌어요.");
+        st.returning = false;
+      }
+    }
+  }
+
+  function frame() {
+    const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    camera.position.set(
+      target.x + orbit.dist * Math.sin(orbit.yaw) * Math.cos(orbit.pitch),
+      target.y + orbit.dist * Math.sin(orbit.pitch),
+      target.z + orbit.dist * Math.cos(orbit.yaw) * Math.cos(orbit.pitch)
+    );
+    camera.lookAt(target);
+
+    // door swings open while someone is coming in
+    if (doorOpenT > 0) doorOpenT -= dt;
+    const doorWant = doorOpenT > 0 ? 1.25 : 0;
+    doorAngle += (doorWant - doorAngle) * Math.min(1, dt * 4);
+    doorPivot.rotation.y = doorAngle;
+    doorLight.intensity = doorAngle * 1.6;
+
+    const W = stage.clientWidth, H = stage.clientHeight;
+    owlState.forEach((st, i) => {
+      if (st.owl && st.entry) {
+        const u = st.owl.userData, key = st.entry.status;
+        const m = reduceMotion ? 0 : 1;
+        u.body.scale.y = 1.08 + m * Math.sin(t * 1.6 + i) * 0.015;
+        // blink
+        st.blinkT -= dt;
+        let ey = key === "awake" && !st.walk ? 0.45 : 1;
+        if (st.blinkT < 0) { ey = 0.08; if (st.blinkT < -0.14) st.blinkT = 2.5 + Math.random() * 3; }
+        u.eyes.scale.y = ey;
+
+        if (st.exit) {
+          stepExit(st, dt);
+          if (!st.owl) return;
+        } else if (st.walk) {
+          stepWalk(st, dt, i);
+          u.head.rotation.set(0, 0, 0);
+        } else {
+          let hx = 0, hy = 0, hz = 0;
+          if (key === "work") hx = 0.18 + m * Math.abs(Math.sin(t * 7 + i)) * 0.05;
+          else if (key === "study") { hx = 0.38; hz = m * Math.sin(t * 0.8 + i) * 0.1; }
+          else if (key === "awake") { hx = 0.22; hz = m * Math.sin(t * 0.5 + i) * 0.05; }
+          else if (key === "slack") hy = m * Math.sin(t * 0.9 + i) * 0.6;
+          u.head.rotation.set(hx, hy, hz);
+          let y = 0.5;
+          if (st.jumpT > 0) { st.jumpT -= dt; y += Math.sin((1 - st.jumpT / 0.7) * Math.PI) * 0.45; }
+          st.owl.position.y = y;
+          let wing = 0;
+          if (st.sipT > 0) { st.sipT -= dt; wing = Math.sin((1 - st.sipT / 1.2) * Math.PI) * 1.6; }
+          u.wings[1].rotation.z = wing; u.wings[0].rotation.z = 0;
+          if (key === "awake") {
+            // both wings forward, holding the phone; thumb-scroll wobble
+            u.wings[0].rotation.x = -1.15; u.wings[1].rotation.x = -1.15;
+            u.wings[0].rotation.z = 0.35; u.wings[1].rotation.z = -0.35;
+            st.phone.visible = true;
+            st.phone.position.y = st.owl.position.y + 0.92 + m * Math.sin(t * 0.7 + i) * 0.015;
+            st.phone.rotation.z = m * Math.sin(t * 0.4 + i) * 0.05;
+          } else { u.wings[0].rotation.x = 0; u.wings[1].rotation.x = 0; }
+          if (key === "study" && st.note.visible) {
+            const w = st.sfx.mode === "burst" ? 1 : 0.15;
+            st.pen.position.x = 0.17 + m * Math.sin(t * 14 + i) * 0.03 * w;
+            st.pen.position.z = 0.02 + m * Math.sin(t * 3.1 + i) * 0.05 * w;
+          }
+        }
+        if (st.tag && !st.tag.hidden) {
+          st.owl.updateMatrixWorld();
+          tmp.set(0, 1.75, 0).applyMatrix4(st.owl.matrixWorld).project(camera);
+          const vis = tmp.z < 1, sx = ((tmp.x + 1) / 2 * W) + "px", sy = ((1 - tmp.y) / 2 * H) + "px";
+          st.tag.style.left = sx; st.tag.style.top = sy; st.tag.style.display = vis ? "" : "none";
+          if (st.bubble && !st.bubble.hidden) { st.bubble.style.left = sx; st.bubble.style.top = sy; st.bubble.style.display = vis ? "" : "none"; }
+        }
+      }
+      for (let h = st.hearts.length - 1; h >= 0; h--) {
+        const s = st.hearts[h], d = s.userData;
+        if (d.delay > 0) { d.delay -= dt; s.visible = false; continue; }
+        s.visible = true; d.life += dt;
+        s.position.y += dt * 0.9; s.position.x += d.vx * dt;
+        s.material.opacity = Math.max(0, 1 - d.life / 1.4);
+        if (d.life > 1.4) { st.group.remove(s); s.material.dispose(); st.hearts.splice(h, 1); }
+      }
+    });
+    owlState.forEach((st) => {
+      if (!st.owl && st.away && st.tag && !st.tag.hidden) {
+        tmp.set(0, 1.55, 0).applyMatrix4(st.group.matrixWorld).project(camera);
+        st.tag.style.left = ((tmp.x + 1) / 2 * W) + "px"; st.tag.style.top = ((1 - tmp.y) / 2 * H) + "px"; st.tag.style.display = tmp.z < 1 ? "" : "none";
+      }
+    });
+    if (mode === "outside") { stepStreet(dt, t, W, H); renderer.render(street, camera); }
+    else renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+
+  // ---------- floors menu ----------
+  $("floorsBtn").addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const m = $("floorMenu");
+    m.hidden = !m.hidden;
+    $("floorsBtn").setAttribute("aria-expanded", String(!m.hidden));
+    if (!m.hidden) renderFloorMenu();
+  });
+  document.addEventListener("click", (ev) => {
+    const m = $("floorMenu");
+    if (!m.hidden && !m.contains(ev.target) && ev.target !== $("floorsBtn")) { m.hidden = true; $("floorsBtn").setAttribute("aria-expanded", "false"); }
+  });
+
+  // ---------- going for a walk ----------
+  const savedOrbit = {};
+  function goOutside() {
+    strolling = false;
+    mode = "outside";
+    if (!streetBuilt) buildStreet();
+    updateStreet(lastList);
+    Object.assign(savedOrbit, { yaw: orbit.yaw, pitch: orbit.pitch, dist: orbit.dist, touched: orbit.touched });
+    orbit.yaw = 0.25; orbit.pitch = 0.16; orbit.touched = false;
+    $("labels").hidden = true; $("outLabels").hidden = false;
+    $("dock").classList.add("outside");
+    $("floorLabel").textContent = "밤에만 불 켜지는 건물 · 건물 앞";
+    resize(); renderMood();
+  }
+  function goInside() {
+    mode = "inside";
+    target.set(-0.4, 1.1, -0.8);
+    Object.assign(orbit, savedOrbit);
+    $("labels").hidden = false; $("outLabels").hidden = true;
+    $("dock").classList.remove("outside");
+    $("floorLabel").textContent = "밤에만 불 켜지는 건물 · " + viewFloor + "층";
+    resize();
+  }
+  $("stroll").addEventListener("click", () => {
+    if (!entered || leaving || strolling || mode === "outside") return;
+    $("floorMenu").hidden = true;
+    if (viewFloor !== me.floor) setViewFloor(me.floor);
+    strolling = true;
+    push({ outside: true });
+    const mine = seatOf("me");
+    if (mine && owlState[mine.seat].owl && !reduceMotion) startExit(owlState[mine.seat], mine.seat, goOutside, true);
+    else { if (mine) { const st = owlState[mine.seat]; if (st.owl) { st.group.remove(st.owl); st.owl = null; } st.away = true; } goOutside(); }
+    sync();
+  });
+  $("comeback").addEventListener("click", () => {
+    if (mode !== "outside") return;
+    goInside();
+    if (viewFloor !== me.floor) setViewFloor(me.floor);
+    push({ outside: false });
+    const mine = seatOf("me");
+    sync();
+    showToast("산책 다녀왔어요. 다시 책상으로 가는 중.");
+  });
+
+  // ---------- the street outside ----------
+  let street = null, streetBuilt = false, building = null, buildingFloors = 0;
+  const walkers = new Map(); // peer -> {owl, x, dir, speed, tag}
+  const outLabels = $("outLabels");
+  const FLOOR_H = 1.7, BLD_W = 14;
+  function makeLabelTex(text, color, bg, w, h, size) {
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d");
+    if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
+    g.fillStyle = color; g.font = "bold " + size + "px 'Gowun Batang', serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, w / 2, h / 2 + 2);
+    const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; return tx;
+  }
+  function buildStreet() {
+    streetBuilt = true;
+    street = new THREE.Scene();
+    street.background = new THREE.Color("#0b0a16");
+    street.fog = new THREE.Fog("#0b0a16", 30, 70);
+    street.add(new THREE.AmbientLight("#4a4370", 0.7));
+    street.add(new THREE.HemisphereLight("#6c6aa8", "#120f1c", 0.35));
+    const moon = new THREE.DirectionalLight("#a9b6ff", 0.45); moon.position.set(-8, 14, 10); street.add(moon);
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(120, 50), new THREE.MeshBasicMaterial({ map: skyTex, fog: false }));
+    sky.position.set(0, 18, -30); street.add(sky);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 80), lambert("#1b1824")); ground.rotation.x = -Math.PI / 2; street.add(ground);
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(60, 0.12, 4), lambert("#3a3546")); walk.position.set(0, 0.06, 3); street.add(walk);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(60, 0.18, 0.25), lambert("#4d4759")); curb.position.set(0, 0.09, 5.1); street.add(curb);
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(60, 9), lambert("#16141d")); road.rotation.x = -Math.PI / 2; road.position.set(0, 0.01, 9.7); street.add(road);
+    for (let x = -28; x < 30; x += 3) { const d = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.15), lambert("#8a8470")); d.rotation.x = -Math.PI / 2; d.position.set(x, 0.02, 9.7); street.add(d); }
+    // neighbours: dark low buildings with a few lit windows
+    [[-17, 7, 9], [17, 6, 11], [-26, 9, 7], [26, 8, 6]].forEach(([x, w, h]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 6), lambert("#16131f")); b.position.set(x, h / 2, -2); street.add(b);
+      for (let k = 0; k < 4; k++) { const wnd = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), new THREE.MeshBasicMaterial({ color: k % 3 ? "#1d2233" : "#c9a15e" })); wnd.position.set(x - w / 2 + 1 + k * (w - 2) / 3, 1.5 + (k * 1.7) % (h - 2), 1.01); street.add(wnd); }
+    });
+    // street lamps
+    [-9, 9].forEach((x) => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 8), lambert("#2c2836")); pole.position.set(x, 2.1, 4.6); street.add(pole);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshBasicMaterial({ color: "#ffd38a" })); head.position.set(x, 4.25, 4.6); street.add(head);
+      const l = new THREE.PointLight("#ffb35a", 1.4, 9, 2); l.position.set(x, 4, 4.6); street.add(l);
+    });
+    const front = new THREE.PointLight("#ffbf6e", 1.2, 8, 2); front.position.set(0, 1.6, 2); street.add(front);
+  }
+  function buildBuilding(floors) {
+    if (building) street.remove(building);
+    building = new THREE.Group(); buildingFloors = floors;
+    const H = floors * FLOOR_H;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(BLD_W, H, 7), lambert("#2a2438")); body.position.set(0, H / 2, -3.5); building.add(body);
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(BLD_W + 0.4, 0.25, 7.4), lambert("#3a3250")); cornice.position.set(0, H + 0.1, -3.5); building.add(cornice);
+    for (let f = 1; f < floors; f++) { const band = new THREE.Mesh(new THREE.BoxGeometry(BLD_W + 0.1, 0.08, 0.1), lambert("#3a3250")); band.position.set(0, f * FLOOR_H, 0.03); building.add(band); }
+    // 1층: entrance
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.35), new THREE.MeshBasicMaterial({ color: "#ffcf8a" })); door.position.set(0, 0.68, 0.02); building.add(door);
+    const awning = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 1.2), lambert("#5b4a72")); awning.position.set(0, 1.45, 0.55); building.add(awning);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.42), new THREE.MeshBasicMaterial({ map: makeLabelTex("밤에만 불 켜지는 건물", "#ffbf5e", "#1d1a2b", 512, 48, 30) })); plate.position.set(-4.4, 1.0, 0.03); building.add(plate);
+    const lobby = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.8), new THREE.MeshBasicMaterial({ color: "#1b2236" })); lobby.position.set(4.4, 0.9, 0.02); building.add(lobby);
+    // roof sign
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.05), new THREE.MeshBasicMaterial({ map: makeLabelTex("올빼미방", "#ffbf5e", null, 512, 128, 84), transparent: true }));
+    sign.position.set(0, H + 0.9, -0.2); building.add(sign);
+    const signBar = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.08, 0.08), lambert("#3a3250")); signBar.position.set(0, H + 0.3, -0.2); building.add(signBar);
+    // floors 2..N: 12 windows each, one per desk
+    building.userData.windows = {};
+    for (let f = 2; f <= floors; f++) {
+      const y = (f - 1) * FLOOR_H + FLOOR_H * 0.52;
+      const list = [];
+      for (let k = 0; k < SEATS.length; k++) {
+        const x = -BLD_W / 2 + 0.95 + k * ((BLD_W - 1.9) / (SEATS.length - 1));
+        const frame = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 1.0), lambert("#3a3250")); frame.position.set(x, y, 0.015); building.add(frame);
+        const wnd = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.86), new THREE.MeshBasicMaterial({ color: "#1b2236" })); wnd.position.set(x, y, 0.025); building.add(wnd);
+        list.push(wnd);
+      }
+      const num = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.35), new THREE.MeshBasicMaterial({ map: makeLabelTex(f + "층", "#a39dbd", "#2a2438", 128, 64, 34) }));
+      num.position.set(BLD_W / 2 + 0.01, y, -0.6); num.rotation.y = Math.PI / 2; building.add(num);
+      building.userData.windows[f] = list;
+    }
+    street.add(building);
+  }
+  // window order follows the desks left to right
+  const SEAT_TO_WINDOW = SEATS.map((s) => s);
+  function windowIndex(seat) {
+    const s = SEATS[seat];
+    const col = COLS.indexOf(s.x), row = ROWS.indexOf(s.z);
+    return row * 4 + col;
+  }
+  function updateStreet(list) {
+    const counts = floorCounts(list);
+    const top = Math.max(2, ...Object.keys(counts).map(Number));
+    if (!building || buildingFloors !== top + 1) buildBuilding(Math.max(3, top + 1));
+    const lit = {};
+    list.forEach((o) => { if (o.seat >= 0) (lit[o.floor] = lit[o.floor] || new Set()).add(windowIndex(o.seat)); });
+    if (entered && me.seat >= 0) (lit[me.floor] = lit[me.floor] || new Set()).add(windowIndex(me.seat));
+    Object.keys(building.userData.windows).forEach((f) => {
+      building.userData.windows[f].forEach((w, k) => w.material.color.set(lit[f] && lit[f].has(k) ? "#ffc66e" : "#1b2236"));
+    });
+    // owls out on the sidewalk
+    const out = list.filter((o) => o.outside).map((o) => ({ key: o.peer, name: o.name, color: o.color, isMe: false }));
+    if (entered && mode === "outside") out.push({ key: "me", name: me.name, color: me.color, isMe: true });
+    const keep = new Set(out.map((o) => o.key));
+    walkers.forEach((w, k) => { if (!keep.has(k)) { street.remove(w.owl); w.tag.remove(); walkers.delete(k); } });
+    out.forEach((o, n) => {
+      let w = walkers.get(o.key);
+      if (w && w.color !== o.color) { street.remove(w.owl); w.tag.remove(); walkers.delete(o.key); w = null; }
+      if (!w) {
+        const owl = makeOwl(FEATHERS[o.color]); owl.scale.setScalar(0.8);
+        const x = o.isMe ? 0 : (Math.random() - 0.5) * 16;
+        owl.position.set(x, 0.12, o.isMe ? 3.4 : 2.2 + Math.random() * 1.8);
+        street.add(owl);
+        const tag = document.createElement("div"); tag.className = "tag" + (o.isMe ? " me" : ""); tag.innerHTML = "<b></b><i>산책 중</i>";
+        outLabels.appendChild(tag);
+        w = { owl, x, dir: Math.random() < 0.5 ? -1 : 1, speed: 0.6 + Math.random() * 0.5, pause: 1 + Math.random() * 3, tag, color: o.color, isMe: o.isMe, t: Math.random() * 10 };
+        walkers.set(o.key, w);
+      }
+      w.tag.querySelector("b").textContent = o.name;
+    });
+  }
+  function stepStreet(dt, t, W, H) {
+    const top = buildingFloors * FLOOR_H;
+    target.set(0, Math.min(top * 0.42, 6), 0);
+    walkers.forEach((w) => {
+      const o = w.owl, u = o.userData;
+      w.t += dt;
+      if (w.isMe) {
+        // stand on the sidewalk, looking up at the lit windows
+        o.rotation.y += (Math.PI - o.rotation.y) * Math.min(1, dt * 4);
+        u.head.rotation.set(-0.45 + Math.sin(w.t * 0.5) * 0.05, Math.sin(w.t * 0.3) * 0.35, 0);
+        o.position.y = 0.12;
+      } else if (w.pause > 0) {
+        w.pause -= dt; o.position.y = 0.12; o.rotation.z *= 0.8;
+        u.head.rotation.set(-0.35, Math.sin(w.t * 0.4) * 0.5, 0);
+        o.rotation.y += (Math.PI - o.rotation.y) * Math.min(1, dt * 3);
+      } else {
+        o.position.x += w.dir * w.speed * dt;
+        if (Math.abs(o.position.x) > 9) { w.dir = -Math.sign(o.position.x); w.pause = 1 + Math.random() * 2; }
+        if (Math.random() < dt * 0.15) w.pause = 1.5 + Math.random() * 3;
+        const want = w.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        o.rotation.y += (want - o.rotation.y) * Math.min(1, dt * 6);
+        const ph = w.t * 10;
+        o.position.y = 0.12 + Math.abs(Math.sin(ph)) * 0.05; o.rotation.z = Math.sin(ph) * 0.12;
+        u.head.rotation.set(0, 0, 0);
+      }
+      st_blink(w, dt);
+      o.updateMatrixWorld();
+      tmp.set(0, 1.75, 0).applyMatrix4(o.matrixWorld).project(camera);
+      w.tag.style.left = ((tmp.x + 1) / 2 * W) + "px"; w.tag.style.top = ((1 - tmp.y) / 2 * H) + "px"; w.tag.style.display = tmp.z < 1 ? "" : "none";
+    });
+  }
+  function st_blink(w, dt) {
+    w.blink = (w.blink === undefined ? 3 : w.blink) - dt;
+    let ey = 1; if (w.blink < 0) { ey = 0.08; if (w.blink < -0.14) w.blink = 2.5 + Math.random() * 3; }
+    w.owl.userData.eyes.scale.y = ey;
+  }
+
+
+  // ---------- feedback box ----------
+  const FB_KINDS = [["idea", "아이디어"], ["bug", "불편해요"], ["love", "좋아요"]];
+  const FB_LABEL = Object.fromEntries(FB_KINDS);
+  let fbKind = "idea", sending = false;
+  const fbKinds = $("fbKinds");
+  FB_KINDS.forEach(([k, label]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.id = "fbk-" + k; b.textContent = label;
+    b.setAttribute("aria-pressed", String(k === fbKind));
+    b.addEventListener("click", () => { fbKind = k; fbKinds.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === b))); });
+    fbKinds.appendChild(b);
+  });
+  $("fbBtn").addEventListener("click", () => { $("fbGate").hidden = false; $("fbText").focus(); });
+  $("fbClose").addEventListener("click", () => { $("fbGate").hidden = true; });
+  $("fbForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = $("fbText").value.replace(/[\u0000-\u0008\u000b-\u001f]/g, "").trim().slice(0, 500);
+    if (!text || sending) return;
+    if (!sb) { showToast("지금은 의견을 보낼 수 없어요."); return; }
+    sending = true; $("fbSend").disabled = true; $("fbSend").textContent = "보내는 중";
+    try {
+      const r = await sb.from("owl_feedback").insert({ kind: fbKind, name: (entered ? me.name : clean(nick.value, 12)) || null, body: text });
+      if (r.error) throw r.error;
+      $("fbText").value = ""; $("fbGate").hidden = true;
+      showToast("의견을 보냈어요. 고마워요!");
+    } catch (err) {
+      showToast("의견을 보내지 못했어요. 잠시 뒤 다시 보내주세요.");
+    } finally { sending = false; $("fbSend").disabled = false; $("fbSend").textContent = "보내기"; }
+  });
+
+  if (!sb) $("fbBtn").hidden = true;
+
+  // ---------- sound: rain + desk sounds ----------
+  let audio = null, noiseBuf = null, rainMaster = null, deskMaster = null, rainBuilt = false;
+  let soundOn = false, deskOn = false, dropTimer = 0, deskTimer = 0;
+  function ensureAudio() {
+    if (audio) return;
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    const len = audio.sampleRate * 2;
+    noiseBuf = audio.createBuffer(1, len, audio.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    rainMaster = audio.createGain(); rainMaster.gain.value = 0; rainMaster.connect(audio.destination);
+    deskMaster = audio.createGain(); deskMaster.gain.value = 0; deskMaster.connect(audio.destination);
+  }
+  function out(node, pan, dest) {
+    if (audio.createStereoPanner) { const p = audio.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); node.connect(p); p.connect(dest); }
+    else node.connect(dest);
+  }
+  function noiseHit(t, type, freq, q, amp, dur, pan, dest) {
+    const src = audio.createBufferSource(); src.buffer = noiseBuf;
+    const f = audio.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g); out(g, pan, dest);
+    src.start(t, Math.random() * 1.8, dur + 0.02);
+  }
+
+  // rain
+  function buildRain() {
+    rainBuilt = true;
+    const hiss = audio.createBufferSource(); hiss.buffer = noiseBuf; hiss.loop = true;
+    const hp = audio.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 900;
+    const lp = audio.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5200;
+    const hg = audio.createGain(); hg.gain.value = 0.045;
+    hiss.connect(hp).connect(lp).connect(hg).connect(rainMaster); hiss.start();
+    const rum = audio.createBufferSource(); rum.buffer = noiseBuf; rum.loop = true; rum.playbackRate.value = 0.5;
+    const rl = audio.createBiquadFilter(); rl.type = "lowpass"; rl.frequency.value = 260;
+    const rg = audio.createGain(); rg.gain.value = 0.22;
+    rum.connect(rl).connect(rg).connect(rainMaster); rum.start();
+    const lfo = audio.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = audio.createGain(); lfoG.gain.value = 0.02;
+    lfo.connect(lfoG).connect(hg.gain); lfo.start();
+  }
+  function plink(t) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    const f = 1500 + Math.random() * 1600;
+    o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.55, t + 0.07);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.035, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g).connect(rainMaster); o.start(t); o.stop(t + 0.14);
+  }
+  function scheduleRain() {
+    const now = audio.currentTime;
+    const n = 3 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < n; i++) noiseHit(now + 0.05 + Math.random() * 0.1, "bandpass", 1400 + Math.random() * 5200, 3 + Math.random() * 6, 0.08 + Math.random() * 0.35, 0.015 + Math.random() * 0.05, Math.random() * 1.6 - 0.8, rainMaster);
+    if (Math.random() < 0.09) plink(now + 0.05 + Math.random() * 0.1);
+  }
+
+  // desk sounds: keyboard + mouse for 작업 중, pen scratching for 공부 중
+  function keyStroke(t, pan, vol) {
+    const space = Math.random() < 0.12;
+    noiseHit(t, "bandpass", space ? 1300 : 2600 + Math.random() * 1800, 1.4, vol * (space ? 0.32 : 0.22 + Math.random() * 0.16), 0.02 + Math.random() * 0.02, pan, deskMaster);
+    noiseHit(t + 0.004, "lowpass", 520, 0.8, vol * (space ? 0.5 : 0.28), 0.045, pan, deskMaster);
+  }
+  function mouseClick(t, pan, vol) {
+    noiseHit(t, "bandpass", 5200 + Math.random() * 900, 5, vol * 0.4, 0.007, pan, deskMaster);
+    noiseHit(t + 0.07 + Math.random() * 0.04, "bandpass", 4600, 5, vol * 0.22, 0.006, pan, deskMaster);
+    if (Math.random() < 0.25) { const t2 = t + 0.16; noiseHit(t2, "bandpass", 5200, 5, vol * 0.38, 0.007, pan, deskMaster); noiseHit(t2 + 0.08, "bandpass", 4600, 5, vol * 0.2, 0.006, pan, deskMaster); }
+  }
+  function penStroke(t, dur, pan, vol) {
+    // a pencil is many tiny grains catching the paper, not a smooth hiss
+    let x = t; const end = t + dur;
+    const bright = 3200 + Math.random() * 2400;
+    while (x < end) {
+      const k = (x - t) / dur, env = Math.sin(Math.PI * k);
+      noiseHit(x, "bandpass", bright * (0.85 + Math.random() * 0.3), 2.2, vol * (0.05 + Math.random() * 0.13) * (0.3 + env), 0.006 + Math.random() * 0.006, pan, deskMaster);
+      x += 0.005 + Math.random() * 0.011;
+    }
+    if (Math.random() < 0.18) noiseHit(end + 0.03, "bandpass", 1800, 3, vol * 0.25, 0.012, pan, deskMaster); // dot / tap
+  }
+  function pageFlip(t, pan, vol) {
+    const src = audio.createBufferSource(); src.buffer = noiseBuf;
+    const bp = audio.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 0.7;
+    bp.frequency.setValueAtTime(700, t); bp.frequency.exponentialRampToValueAtTime(2600, t + 0.35);
+    const g = audio.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol * 0.14, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    src.connect(bp).connect(g); out(g, pan, deskMaster); src.start(t, Math.random(), 0.5);
+  }
+  function scheduleDesk() {
+    const now = audio.currentTime, horizon = now + 0.2;
+    owlState.forEach((st) => {
+      const e = st.entry;
+      if (!e || st.walk || (e.status !== "work" && e.status !== "study")) { st.sfx.mode = "pause"; return; }
+      const sx = st.sfx, pan = st.group.position.x / 5, vol = e.isMe ? 0.55 : 1;
+      if (sx.next < now) sx.next = now + 0.05;
+      if (sx.until < now) {
+        if (sx.mode === "burst") { sx.mode = "pause"; sx.until = now + 0.6 + Math.random() * 2.2; }
+        else { sx.mode = "burst"; sx.until = now + (e.status === "work" ? 1.2 + Math.random() * 3 : 1 + Math.random() * 2.5); }
+      }
+      if (e.status === "work") {
+        if (sx.click < now) sx.click = now + 2 + Math.random() * 5;
+        if (sx.click < horizon) { mouseClick(sx.click, pan, vol); sx.click = now + 2.5 + Math.random() * 5; }
+        if (sx.mode !== "burst") return;
+        while (sx.next < horizon && sx.next < sx.until) { keyStroke(sx.next, pan, vol); sx.next += 0.06 + Math.random() * 0.13; }
+      } else {
+        if (!sx.flip || sx.flip < now) sx.flip = now + 12 + Math.random() * 20;
+        if (sx.flip < horizon) { pageFlip(sx.flip, pan, vol); sx.flip = now + 15 + Math.random() * 25; }
+        if (sx.mode !== "burst") return;
+        while (sx.next < horizon && sx.next < sx.until) {
+          const dur = 0.08 + Math.random() * 0.3;
+          penStroke(sx.next, dur, pan, vol);
+          sx.next += dur + 0.05 + Math.random() * 0.2;
+        }
+      }
+    });
+  }
+
+  function toggleBtn(btn, on, onText, offText) { btn.textContent = on ? onText : offText; btn.setAttribute("aria-pressed", String(on)); }
+  $("sound").addEventListener("click", (e) => {
+    try {
+      ensureAudio(); audio.resume();
+      if (!rainBuilt) buildRain();
+      soundOn = !soundOn;
+      rainMaster.gain.setTargetAtTime(soundOn ? 0.8 : 0, audio.currentTime, 0.5);
+      clearInterval(dropTimer); if (soundOn) dropTimer = setInterval(scheduleRain, 100);
+      toggleBtn(e.currentTarget, soundOn, "빗소리 끄기", "빗소리");
+    } catch (err) { showToast("이 브라우저에서는 소리를 켤 수 없어요."); }
+  });
+  $("desksound").addEventListener("click", (e) => {
+    try {
+      ensureAudio(); audio.resume();
+      deskOn = !deskOn;
+      deskMaster.gain.setTargetAtTime(deskOn ? 0.9 : 0, audio.currentTime, 0.2);
+      clearInterval(deskTimer); if (deskOn) deskTimer = setInterval(scheduleDesk, 100);
+      toggleBtn(e.currentTarget, deskOn, "책상 소리 끄기", "책상 소리");
+      if (deskOn && !owlState.some((st) => st.entry && (st.entry.status === "work" || st.entry.status === "study"))) showToast("작업 중이나 공부 중인 올빼미가 있으면 소리가 나요.");
+    } catch (err) { showToast("이 브라우저에서는 소리를 켤 수 없어요."); }
+  });
+  function hootSound() {
+    if (!audio || (!soundOn && !deskOn)) return;
+    [0, 0.32].forEach((off, i) => {
+      const o = audio.createOscillator(), g = audio.createGain(); o.type = "sine"; o.frequency.value = i ? 392 : 440;
+      const t0 = audio.currentTime + off;
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.18, t0 + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.28);
+      o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + 0.3);
+    });
+  }
+
+  sync();
+
+  // ---------- connect ----------
+  if (net) {
+    net.onChange(() => { onFloorChange(); sync(); });
+    net.onCheer(onCheer);
+    net.view();
+  }
+})();
+</script>
+</body>
+</html>
