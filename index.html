@@ -267,8 +267,7 @@ input[type="text"] {
   <div class="actions" data-in style="margin-left:0">
     <button class="btn" id="stroll" type="button">산책가기</button>
     <button class="btn" id="floorsBtn" type="button" aria-expanded="false" aria-controls="floorMenu">다른 층 구경가기</button>
-    <!-- 의견 보내기: 다시 쓰려면 hidden 을 지우세요 -->
-    <button class="btn" id="fbBtn" type="button" hidden>의견 보내기</button>
+    <button class="btn" id="fbBtn" type="button">의견 보내기</button>
     <button class="btn quiet" id="leave" type="button">퇴장하기</button>
   </div>
 </div>
@@ -463,9 +462,7 @@ input[type="text"] {
     $("dock").hidden = true;
     push({ leaving: Date.now() });
     const mine = seatOf("me");
-    let done = false;
     const finish = () => {
-      if (done) return; done = true;
       const stayed = fmtElapsed(Date.now() - me.since);
       entered = false; leaving = false;
       if (net) net.leave();
@@ -477,8 +474,7 @@ input[type="text"] {
       $("gate").hidden = false;
       sync();
     };
-    if (mine) { startExit(owlState[mine.seat], mine.seat, finish); setTimeout(finish, 15000); } // 탭이 뒤로 가서 애니메이션이 멈춰도 퇴장은 끝나게
-    else finish();
+    if (mine) startExit(owlState[mine.seat], mine.seat, finish); else finish();
   });
   $("myname").addEventListener("click", () => { nick.value = me.name; $("enter").textContent = "바꾸기"; jobIn.value = me.job; $("gate").hidden = false; nick.focus(); });
 
@@ -1440,10 +1436,7 @@ input[type="text"] {
     strolling = true;
     push({ outside: true });
     const mine = seatOf("me");
-    if (mine && owlState[mine.seat].owl && !reduceMotion) {
-      let out = false; const go = () => { if (out) return; out = true; goOutside(); };
-      startExit(owlState[mine.seat], mine.seat, go, true); setTimeout(go, 12000);
-    }
+    if (mine && owlState[mine.seat].owl && !reduceMotion) startExit(owlState[mine.seat], mine.seat, goOutside, true);
     else { if (mine) { const st = owlState[mine.seat]; if (st.owl) { st.group.remove(st.owl); st.owl = null; } st.away = true; } goOutside(); }
     sync();
   });
